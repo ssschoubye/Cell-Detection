@@ -128,6 +128,7 @@ void write_bitmap(unsigned char input_image_array[BMP_WIDTH][BMP_HEIGTH][BMP_CHA
   bwrite(out_bmp, output_file_path);
 }
 
+
 // Private (ex-public) function declarations
 BMP* bopen(char* file_path)
 {
