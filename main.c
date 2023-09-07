@@ -86,6 +86,8 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
 
 void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT])
 {
+  unsigned int amount_of_cells = 0;
+
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
@@ -93,8 +95,6 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
       removed_cells_image[x][y] = eroded_image[x][y];
     }
   }
-  unsigned int amount_of_cells = 0;
-  unsigned char cell_detected = 0;
 
   for (int x = 6; x < BMP_WIDTH - 5; x++)
   {
@@ -102,45 +102,43 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
     {
       unsigned char white_in_inner_square = 0;
       unsigned char white_in_outer_square = 0;
+      unsigned char cell_detected = 0;
       for (signed char dx = -6; dx < 6; dx++)
       {
         for (signed char dy = -6; dy < 6; dy++)
         {
-          if (eroded_image[x + dx][y + dy] != 0)
+          if (removed_cells_image[x + dx][y + dy] == 255)
           {
-            if (dx >= -5 && dx < 5 && dy >= -5 && dy < 5)
+            // Tjek den indre og ydre firkant
+            if (-5 <= dx && dx <= 4 && -5 <= dy && dy <= 4)
             {
               white_in_inner_square = 1;
-              cell_detected = 1;
-              if (dx == -6 || dx == 5 || dy == -6 || dy == 5)
-                white_in_outer_square = 1;
-                cell_detected = 0;
-                if(cell_detected)
-                break;
             }
-            if(cell_detected)
-            break;
+            if (dx == -6 || dx == 5 || dy == -6 || dy == 5)
+            {
+              white_in_outer_square = 1;
+            }
+            if (white_in_inner_square && !white_in_outer_square)
+              cell_detected = 1;
           }
-          if(cell_detected)
-          break;
         }
-        if(cell_detected)
-        break;
       }
-      if (white_in_inner_square && !white_in_outer_square)
+      // Farv den indre firkant sort, hvis en celle bliver fundet
+      if (cell_detected)
       {
         amount_of_cells++;
-        printf("The value of amount of cells is %u\n", amount_of_cells);
-        for (signed char dx = -6; dx < 6; dx++)
+        printf("Antallet af celler på billedet er %u\n", amount_of_cells);
+        for (signed char dx = -5; dx < 5; dx++)
         {
-          for (signed char dy = -6; dy < 6; dy++)
+          for (signed char dy = -5; dy < 5; dy++)
           {
             removed_cells_image[x + dx][y + dy] = 0;
           }
         }
-        break;
-      }
+        y += 12; 
+      } 
     }
+    x += 12;
   }
 }
 
@@ -182,7 +180,7 @@ int main(int argc, char **argv)
 
   erode(black_white_image, eroded_image);
 
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 10; i++)
   {
     erode(eroded_image, eroded_image);
   }
