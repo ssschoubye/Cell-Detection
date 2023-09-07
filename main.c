@@ -2,21 +2,6 @@
 #include <stdio.h>
 #include "cbmp.h"
 
-// Function to invert pixels of an image (negative)
-void invert(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char output_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
-{
-  for (int x = 0; x < BMP_WIDTH; x++)
-  {
-    for (int y = 0; y < BMP_HEIGHT; y++)
-    {
-      for (int c = 0; c < BMP_CHANNELS; c++)
-      {
-        output_image[x][y][c] = 255 - input_image[x][y][c];
-      }
-    }
-  }
-}
-
 void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT])
 {
   for (int x = 0; x < BMP_WIDTH; x++)
@@ -28,6 +13,7 @@ void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], un
       unsigned char blue = rgb_image[x][y][2];
 
       unsigned char grey = (red + green + blue) / 3;
+      // binray threshhold kan laves her. så kan man slippe for division, og for at lagre den midlertidige resultat grey_scale_image i et array
 
       grey_scale_image[x][y] = grey;
     }
@@ -70,10 +56,10 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
   {
     for (int y = 1; y < BMP_HEIGHT - 1; y++)
     {
-      int shouldErode = 0;
-      for (int dx = -1; dx <= 1; dx++)
+      unsigned char shouldErode = 0;
+      for (signed char dx = -1; dx <= 1; dx++)
       {
-        for (int dy = -1; dy <= 1; dy++)
+        for (signed char dy = -1; dy <= 1; dy++)
         {
           if (erosion_structure[dx + 1][dy + 1] == 1 && black_white_image[x + dx][y + dy] == 0)
           {
@@ -98,6 +84,66 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
   }
 }
 
+void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT])
+{
+  for (int x = 0; x < BMP_WIDTH; x++)
+  {
+    for (int y = 0; y < BMP_HEIGHT; y++)
+    {
+      removed_cells_image[x][y] = eroded_image[x][y];
+    }
+  }
+  unsigned int amount_of_cells = 0;
+  unsigned char cell_detected = 0;
+
+  for (int x = 6; x < BMP_WIDTH - 5; x++)
+  {
+    for (int y = 6; y < BMP_HEIGHT - 5; y++)
+    {
+      unsigned char white_in_inner_square = 0;
+      unsigned char white_in_outer_square = 0;
+      for (signed char dx = -6; dx < 6; dx++)
+      {
+        for (signed char dy = -6; dy < 6; dy++)
+        {
+          if (eroded_image[x + dx][y + dy] != 0)
+          {
+            if (dx >= -5 && dx < 5 && dy >= -5 && dy < 5)
+            {
+              white_in_inner_square = 1;
+              cell_detected = 1;
+              if (dx == -6 || dx == 5 || dy == -6 || dy == 5)
+                white_in_outer_square = 1;
+                cell_detected = 0;
+                if(cell_detected)
+                break;
+            }
+            if(cell_detected)
+            break;
+          }
+          if(cell_detected)
+          break;
+        }
+        if(cell_detected)
+        break;
+      }
+      if (white_in_inner_square && !white_in_outer_square)
+      {
+        amount_of_cells++;
+        printf("The value of amount of cells is %u\n", amount_of_cells);
+        for (signed char dx = -6; dx < 6; dx++)
+        {
+          for (signed char dy = -6; dy < 6; dy++)
+          {
+            removed_cells_image[x + dx][y + dy] = 0;
+          }
+        }
+        break;
+      }
+    }
+  }
+}
+
 void convert_2d_to_3d(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
 {
   for (int x = 0; x < BMP_WIDTH; x++)
@@ -111,31 +157,23 @@ void convert_2d_to_3d(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
   }
 }
 
-// Declaring the array to store the image (unsigned char = unsigned 8 bit)
 unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 unsigned char output_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
+unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
+unsigned int amount_of_cells;
 
-// Main function
 int main(int argc, char **argv)
 {
-  // argc counts how may arguments are passed
-  // argv[0] is a string with the name of the program
-  // argv[1] is the first command line argument (input image)
-  // argv[2] is the second command line argument (output image)
 
-  // Checking that 2 arguments are passed
   if (argc != 3)
   {
-    fprintf(stderr, "Usage: %s <output file path> <output file path>\n", argv[0]);
+    fprintf(stderr, "Wrong main arguments. Use: %s <output file path> <output file path>\n", argv[0]);
     exit(1);
   }
 
-  printf("Example program - 02132 - A1\n");
-
-  // Load image from file
   read_bitmap(argv[1], input_image);
 
   grey_scale(input_image, grey_image);
@@ -143,16 +181,19 @@ int main(int argc, char **argv)
   binary_threshold(grey_image, black_white_image);
 
   erode(black_white_image, eroded_image);
-  
-  for(int i=0; i < 5; i++){
+
+  for (int i = 0; i < 5; i++)
+  {
     erode(eroded_image, eroded_image);
   }
 
-  convert_2d_to_3d(eroded_image, output_image);
+  detect_cells(eroded_image, removed_cells_image);
 
-  // Save image to file
+  convert_2d_to_3d(removed_cells_image, output_image);
+
   write_bitmap(output_image, argv[2]);
 
   printf("Done!\n");
+  printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
 }
