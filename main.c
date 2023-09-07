@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "cbmp.h"
+#include <string.h>
 
 void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT])
 {
@@ -52,6 +53,7 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
     }
   }
 
+  unsigned char erosion_happened = 0;
   for (int x = 1; x < BMP_WIDTH - 1; x++)
   {
     for (int y = 1; y < BMP_HEIGHT - 1; y++)
@@ -72,6 +74,7 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
       }
       if (shouldErode)
         temp_image[x][y] = 0;
+        erosion_happened = 1;
     }
   }
 
@@ -86,19 +89,21 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
 
 void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT])
 {
+  unsigned char padded_image[BMP_WIDTH + 12][BMP_HEIGHT + 12];
+  memset(padded_image, 0, sizeof(padded_image)); // fylder padded_image med 0'er
   unsigned int amount_of_cells = 0;
 
-  for (int x = 0; x < BMP_WIDTH; x++)
+  for (int x = 6; x < BMP_WIDTH; x++)
   {
-    for (int y = 0; y < BMP_HEIGHT; y++)
+    for (int y = 6; y < BMP_HEIGHT; y++)
     {
-      removed_cells_image[x][y] = eroded_image[x][y];
+      padded_image[x][y] = eroded_image[x][y];
     }
   }
 
-  for (int x = 6; x < BMP_WIDTH - 5; x++)
+  for (int x = 0; x <= BMP_WIDTH; x++)
   {
-    for (int y = 6; y < BMP_HEIGHT - 5; y++)
+    for (int y = 0; y <= BMP_HEIGHT; y++)
     {
       unsigned char white_in_inner_square = 0;
       unsigned char white_in_outer_square = 0;
@@ -107,7 +112,7 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
       {
         for (signed char dy = -6; dy < 6; dy++)
         {
-          if (removed_cells_image[x + dx][y + dy] == 255)
+          if (padded_image[x + dx][y + dy] == 255)
           {
             // Tjek den indre og ydre firkant
             if (-5 <= dx && dx <= 4 && -5 <= dy && dy <= 4)
@@ -132,13 +137,20 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
         {
           for (signed char dy = -5; dy < 5; dy++)
           {
-            removed_cells_image[x + dx][y + dy] = 0;
+            padded_image[x + dx][y + dy] = 0;
           }
         }
-        y += 12; 
-      } 
+        y += 9; // Alle celler bliver indfanget af detectoren, når vi hopper 9 pixels frem. Jeg er ikke sikker på, hvorfor det lige præcis er 9 pixels.
+      }
     }
-    x += 12;
+    x += 9;
+  }
+  for (int x = 6; x < BMP_WIDTH; x++)
+  {
+    for (int y = 6; y < BMP_HEIGHT; y++)
+    {
+      removed_cells_image[x][y] = padded_image[x][y];
+    }
   }
 }
 
