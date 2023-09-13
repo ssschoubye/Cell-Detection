@@ -8,6 +8,7 @@ unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 
 unsigned int amount_of_cells = 0;
 unsigned int erosion_happened = 0;
+unsigned int coordinate_index = 0;
 
 typedef struct
 {
@@ -156,7 +157,11 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
       // Farv den indre firkant sort, hvis en celle bliver fundet
       if (cell_detected)
       {
+        coordinates[coordinate_index].x = x;
+        coordinates[coordinate_index].y =y;
+        printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells+1, coordinates[coordinate_index].x, coordinates[coordinate_index].y);
         amount_of_cells++;
+        coordinate_index++; 
         for (signed char dx = -5; dx < 5; dx++)
         {
           for (signed char dy = -5; dy < 5; dy++)
@@ -188,7 +193,7 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
   }
   else if (!erosion_happened)
   {
-    printf("Igen erosion skete. Alle celler er opdaget! Bestemmer placering af celler...\n");
+    printf("Alle celler er opdaget!\n");
   }
 }
 
@@ -234,6 +239,6 @@ int main(int argc, char **argv)
   // write_bitmap(output_image, argv[2]);
 
   // printf("Done!\n");
-  printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
+  printf("På billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
 }
