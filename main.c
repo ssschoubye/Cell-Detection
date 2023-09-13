@@ -230,22 +230,27 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
 
     for (int dx = -6; dx < 7; dx++)
     {
-      for (int dy = -6; dy < 7; dy++)
-      {
-        int x = base_x + dx;
-        int y = base_y + dy;
-
+        int x = coordinates[i].x + dx;
+        int y = coordinates[i].y;
         if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
         {
-          if (dx == -6 || dx == 6 || dy == -6 || dy == 6)
-          {
             input_image[x][y][0] = 255;
             input_image[x][y][1] = 0;
             input_image[x][y][2] = 0;
-          }
+        }
+    }
+    for (int dy = -6; dy < 7; dy++)
+      {
+        int x = coordinates[i].x;
+        int y = coordinates[i].y + dy;
+        if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
+        {
+            input_image[x][y][0] = 255;
+            input_image[x][y][1] = 0;
+            input_image[x][y][2] = 0;
+          
         }
       }
-    }
   }
 }
 
@@ -272,7 +277,7 @@ int main(int argc, char **argv)
 
   erode_and_detect_loop(black_white_image);
 
-  // convert_2d_to_3d(removed_cells_image, output_image);
+  //convert_2d_to_3d(removed_cells_image, output_image);
 
   insert_marks_at_cell_locations(input_image);
 
