@@ -8,7 +8,7 @@ unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 
 unsigned int amount_of_cells = 0;
 unsigned int erosion_happened = 0;
-unsigned int coordinate_index = 0;
+// unsigned int coordinate_index = 0;
 
 typedef struct
 {
@@ -157,11 +157,11 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
       // Farv den indre firkant sort, hvis en celle bliver fundet
       if (cell_detected)
       {
-        coordinates[coordinate_index].x = x;
-        coordinates[coordinate_index].y =y;
-        printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells+1, coordinates[coordinate_index].x, coordinates[coordinate_index].y);
+        coordinates[amount_of_cells].x = x;
+        coordinates[amount_of_cells].y = y;
+        printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells + 1, coordinates[amount_of_cells].x, coordinates[amount_of_cells].y);
         amount_of_cells++;
-        coordinate_index++; 
+        // coordinate_index++;
         for (signed char dx = -5; dx < 5; dx++)
         {
           for (signed char dy = -5; dy < 5; dy++)
@@ -169,10 +169,10 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
             padded_image[x + dx][y + dy] = 0;
           }
         }
-        //y += 6; // Alle celler bliver indfanget af detectoren, når vi hopper 6 pixels frem, så vi ikke tjekker samme område flere gange end nødvendigt.
+        // y += 6; // Alle celler bliver indfanget af detectoren, når vi hopper 6 pixels frem, så vi ikke tjekker samme område flere gange end nødvendigt.
       }
     }
-    //x += 6;
+    // x += 6;
   }
   for (int x = 6; x < BMP_WIDTH; x++)
   {
@@ -194,6 +194,30 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
   else if (!erosion_happened)
   {
     printf("Alle celler er opdaget!\n");
+  }
+}
+
+void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
+{
+  for (int i = 0; i < amount_of_cells; i++)
+  {
+    for (int dx = -6; dx < 7; dx++)
+    {
+      for (int dy = -6; dy < 7; dy++)
+      {
+        int x = coordinates[i].x + dx;
+        int y = coordinates[i].y + dy;
+        if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
+        {
+          if (dx == -6 || dx == 6 || dy == -6 || dy == 6)
+          {
+            input_image[x][y][0] = 255;
+            input_image[x][y][1] = 0;
+            input_image[x][y][2] = 0;
+          }
+        }
+      }
+    }
   }
 }
 
@@ -236,7 +260,9 @@ int main(int argc, char **argv)
 
   // convert_2d_to_3d(removed_cells_image, output_image);
 
-  // write_bitmap(output_image, argv[2]);
+  insert_marks_at_cell_locations(input_image);
+
+  write_bitmap(input_image, argv[2]);
 
   // printf("Done!\n");
   printf("På billedet var antallet af celler lig med: %d\n", amount_of_cells);
