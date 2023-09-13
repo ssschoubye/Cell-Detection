@@ -239,7 +239,7 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
             input_image[x][y][2] = 0;
         }
     }
-    for (int dy = -6; dy < 7; dy++)
+    for (int dy = -8; dy < 9; dy++)
       {
         int x = coordinates[i].x;
         int y = coordinates[i].y + dy;
