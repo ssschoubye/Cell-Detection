@@ -3,6 +3,20 @@
 #include "cbmp.h"
 #include <string.h>
 
+unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
+unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
+
+unsigned int amount_of_cells = 0;
+unsigned int erosion_happened = 0;
+
+typedef struct
+{
+  unsigned int x;
+  unsigned int y;
+} Coordinate;
+
+Coordinate coordinates[1000];
+
 void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT])
 {
   for (int x = 0; x < BMP_WIDTH; x++)
@@ -42,6 +56,7 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 
 void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT])
 {
+  unsigned char erosion_done = 0;
   unsigned char erosion_structure[3][3] = {{0, 1, 0}, {1, 1, 1}, {0, 1, 0}};
   unsigned char temp_image[BMP_WIDTH][BMP_HEIGHT];
 
@@ -53,7 +68,6 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
     }
   }
 
-  unsigned char erosion_happened = 0;
   for (int x = 1; x < BMP_WIDTH - 1; x++)
   {
     for (int y = 1; y < BMP_HEIGHT - 1; y++)
@@ -65,16 +79,21 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
         {
           if (erosion_structure[dx + 1][dy + 1] == 1 && black_white_image[x + dx][y + dy] == 0)
           {
-            shouldErode = 1;
-            break;
+            if (black_white_image[x][y] == 255)
+            {
+              shouldErode = 1;
+              break;
+            }
           }
         }
         if (shouldErode)
           break;
       }
       if (shouldErode)
+      {
         temp_image[x][y] = 0;
-        erosion_happened = 1;
+        erosion_done = 1;
+      }
     }
   }
 
@@ -85,13 +104,14 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
       eroded_image[x][y] = temp_image[x][y];
     }
   }
+  erosion_happened = erosion_done;
 }
 
 void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT])
 {
+  unsigned char cell_detected = 0;
   unsigned char padded_image[BMP_WIDTH + 12][BMP_HEIGHT + 12];
   memset(padded_image, 0, sizeof(padded_image)); // fylder padded_image med 0'er
-  unsigned int amount_of_cells = 0;
 
   for (int x = 6; x < BMP_WIDTH; x++)
   {
@@ -101,13 +121,12 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
     }
   }
 
-  for (int x = 0; x <= BMP_WIDTH; x++)
+  for (int x = 5; x <= BMP_WIDTH - 5; x++)
   {
-    for (int y = 0; y <= BMP_HEIGHT; y++)
+    for (int y = 5; y <= BMP_HEIGHT - 5; y++)
     {
       unsigned char white_in_inner_square = 0;
       unsigned char white_in_outer_square = 0;
-      unsigned char cell_detected = 0;
       for (signed char dx = -6; dx < 6; dx++)
       {
         for (signed char dy = -6; dy < 6; dy++)
@@ -123,16 +142,21 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
             {
               white_in_outer_square = 1;
             }
-            if (white_in_inner_square && !white_in_outer_square)
-              cell_detected = 1;
           }
+        }
+        if (white_in_inner_square == 1 && white_in_outer_square == 0)
+        {
+          cell_detected = 1;
+        }
+        else
+        {
+          cell_detected = 0;
         }
       }
       // Farv den indre firkant sort, hvis en celle bliver fundet
       if (cell_detected)
       {
         amount_of_cells++;
-        printf("Antallet af celler på billedet er %u\n", amount_of_cells);
         for (signed char dx = -5; dx < 5; dx++)
         {
           for (signed char dy = -5; dy < 5; dy++)
@@ -140,10 +164,10 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
             padded_image[x + dx][y + dy] = 0;
           }
         }
-        y += 9; // Alle celler bliver indfanget af detectoren, når vi hopper 9 pixels frem. Jeg er ikke sikker på, hvorfor det lige præcis er 9 pixels.
+        //y += 6; // Alle celler bliver indfanget af detectoren, når vi hopper 6 pixels frem, så vi ikke tjekker samme område flere gange end nødvendigt.
       }
     }
-    x += 9;
+    //x += 6;
   }
   for (int x = 6; x < BMP_WIDTH; x++)
   {
@@ -151,6 +175,20 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
     {
       removed_cells_image[x][y] = padded_image[x][y];
     }
+  }
+}
+
+void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
+{
+  erode(black_white_image, eroded_image);
+  if (erosion_happened)
+  {
+    detect_cells(eroded_image, removed_cells_image);
+    erode_and_detect_loop(removed_cells_image);
+  }
+  else if (!erosion_happened)
+  {
+    printf("Igen erosion skete. Alle celler er opdaget! Bestemmer placering af celler...\n");
   }
 }
 
@@ -173,7 +211,6 @@ unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
-unsigned int amount_of_cells;
 
 int main(int argc, char **argv)
 {
@@ -190,20 +227,13 @@ int main(int argc, char **argv)
 
   binary_threshold(grey_image, black_white_image);
 
-  erode(black_white_image, eroded_image);
+  erode_and_detect_loop(black_white_image);
 
-  for (int i = 0; i < 10; i++)
-  {
-    erode(eroded_image, eroded_image);
-  }
+  // convert_2d_to_3d(removed_cells_image, output_image);
 
-  detect_cells(eroded_image, removed_cells_image);
+  // write_bitmap(output_image, argv[2]);
 
-  convert_2d_to_3d(removed_cells_image, output_image);
-
-  write_bitmap(output_image, argv[2]);
-
-  printf("Done!\n");
+  // printf("Done!\n");
   printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
 }
