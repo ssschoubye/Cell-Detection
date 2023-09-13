@@ -201,7 +201,7 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
 {
   for (int i = 0; i < amount_of_cells; i++)
   {
-    for (int dx = -6; dx < 7; dx++)
+    for (int dx = -8; dx < 9; dx++)
     {
         int x = coordinates[i].x + dx;
         int y = coordinates[i].y;
@@ -212,7 +212,7 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
             input_image[x][y][2] = 0;
         }
     }
-    for (int dy = -6; dy < 7; dy++)
+    for (int dy = -8; dy < 9; dy++)
       {
         int x = coordinates[i].x;
         int y = coordinates[i].y + dy;
