@@ -110,77 +110,106 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
 
 void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT])
 {
+  printf("detect cells begyndt\n");
   unsigned char cell_detected = 0;
-  unsigned char padded_image[BMP_WIDTH + 12][BMP_HEIGHT + 12];
-  memset(padded_image, 0, sizeof(padded_image)); // fylder padded_image med 0'er
+  int size_of_detection_area_axes = 6;
 
-  for (int x = 6; x < BMP_WIDTH; x++)
+  for (int x = 0; x < BMP_WIDTH; x++)
   {
-    for (int y = 6; y < BMP_HEIGHT; y++)
+    for (int y = 0; y < BMP_HEIGHT; y++)
     {
-      padded_image[x][y] = eroded_image[x][y];
-    }
-  }
-
-  for (int x = 5; x <= BMP_WIDTH - 5; x++)
-  {
-    for (int y = 5; y <= BMP_HEIGHT - 5; y++)
-    {
-      unsigned char white_in_inner_square = 0;
-      unsigned char white_in_outer_square = 0;
-      for (signed char dx = -6; dx < 6; dx++)
+      if (eroded_image[x][y] == 255)
       {
-        for (signed char dy = -6; dy < 6; dy++)
+        cell_detected = 1;
+        int i = size_of_detection_area_axes;
+        while (i >= -size_of_detection_area_axes)
         {
-          if (padded_image[x + dx][y + dy] == 255)
+          unsigned char rightBoundary;
+          unsigned char leftBoundary;
+          unsigned char topBoundary;
+          unsigned char bottomBoundary;
+
+          if (x + i <= 0)
           {
-            // Tjek den indre og ydre firkant
-            if (-5 <= dx && dx <= 4 && -5 <= dy && dy <= 4)
+            rightBoundary = eroded_image[0][y + (size_of_detection_area_axes + 1)];
+            leftBoundary = eroded_image[0][y - (size_of_detection_area_axes + 1)];
+          }
+          else if (x + i >= BMP_WIDTH - 1)
+          {
+            rightBoundary = eroded_image[BMP_WIDTH - 1][y + (size_of_detection_area_axes + 1)];
+            leftBoundary = eroded_image[BMP_WIDTH - 1][y - (size_of_detection_area_axes + 1)];
+          }
+          else
+          {
+            rightBoundary = eroded_image[x + i][y + (size_of_detection_area_axes + 1)];
+            leftBoundary = eroded_image[x + i][y - (size_of_detection_area_axes + 1)];
+          }
+
+          if (y + i <= 0)
+          {
+            topBoundary = eroded_image[x - (size_of_detection_area_axes + 1)][0];
+            bottomBoundary = eroded_image[x + (size_of_detection_area_axes + 1)][0];
+          }
+          else if (y + i >= BMP_HEIGHT - 1)
+          {
+            topBoundary = eroded_image[x - (size_of_detection_area_axes + 1)][BMP_HEIGHT - 1];
+            bottomBoundary = eroded_image[x + (size_of_detection_area_axes + 1)][BMP_HEIGHT - 1];
+          }
+          else
+          {
+            topBoundary = eroded_image[x - (size_of_detection_area_axes + 1)][y + i];
+            bottomBoundary = eroded_image[x + (size_of_detection_area_axes + 1)][y + i];
+          }
+          if (topBoundary == 255 || bottomBoundary == 255)
+          {
+            if (topBoundary == 255)
             {
-              white_in_inner_square = 1;
+              printf("Hvid pixel fundet på øverste kant\n");
             }
-            if (dx == -6 || dx == 5 || dy == -6 || dy == 5)
+            if (bottomBoundary == 255)
             {
-              white_in_outer_square = 1;
+              printf("Hvid pixel fundet på nederste kant\n");
+            }
+            cell_detected = 0;
+            // y = y + size_of_detection_area_axes + dy;
+            break;
+          }
+          else if (rightBoundary == 255 || leftBoundary == 255)
+          {
+            if (rightBoundary == 255)
+            {
+              printf("Hvid pixel fundet på højre kant\n");
+            }
+            if (leftBoundary == 255)
+            {
+              printf("Hvid pixel fundet på venstre kant\n");
+            }
+            cell_detected = 0;
+            // Opdater x?
+            break;
+          }
+          i--;
+        }
+        if (cell_detected)
+        {
+          amount_of_cells++;
+          coordinates[amount_of_cells].x = x;
+          coordinates[amount_of_cells].y = y;
+          printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells + 1, coordinates[amount_of_cells].x, coordinates[amount_of_cells].y);
+          // coordinate_index++;
+          for (signed char dx = -size_of_detection_area_axes - 1; dx < size_of_detection_area_axes - 1; dx++)
+          {
+            for (signed char dy = -size_of_detection_area_axes - 1; dy < size_of_detection_area_axes - 1; dy++)
+            {
+              removed_cells_image[x + dx][y + dy] = 0;
+              printf("Område farvet sort\n");
             }
           }
         }
-        if (white_in_inner_square == 1 && white_in_outer_square == 0)
-        {
-          cell_detected = 1;
-        }
-        else
-        {
-          cell_detected = 0;
-        }
-      }
-      // Farv den indre firkant sort, hvis en celle bliver fundet
-      if (cell_detected)
-      {
-        coordinates[amount_of_cells].x = x;
-        coordinates[amount_of_cells].y = y;
-        printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells + 1, coordinates[amount_of_cells].x, coordinates[amount_of_cells].y);
-        amount_of_cells++;
-        // coordinate_index++;
-        for (signed char dx = -5; dx < 5; dx++)
-        {
-          for (signed char dy = -5; dy < 5; dy++)
-          {
-            padded_image[x + dx][y + dy] = 0;
-          }
-        }
-        // y += 6; // Alle celler bliver indfanget af detectoren, når vi hopper 6 pixels frem, så vi ikke tjekker samme område flere gange end nødvendigt.
       }
     }
-    // x += 6;
   }
-  for (int x = 6; x < BMP_WIDTH; x++)
-  {
-    for (int y = 6; y < BMP_HEIGHT; y++)
-    {
-      removed_cells_image[x][y] = padded_image[x][y];
-    }
-  }
+  // Farv den indre firkant sort, hvis en celle bliver fundet
 }
 
 void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
