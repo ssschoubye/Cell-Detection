@@ -36,7 +36,6 @@ Coordinate coordinates[1000];
 void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT])
 {
   int freq_array[256]={0};
-  unsigned int wc_Variance;
   float bc_Variance;
   float prob1;
   float prob2;
@@ -78,8 +77,6 @@ void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], un
             count2+= freq_array[j];
             sum2+= j*freq_array[j];
             }
-        
-          
         }
           prob1 = count1 / (float)total_pixels;
           prob2 = count2 / (float)total_pixels;
@@ -122,6 +119,8 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
   unsigned char erosion_structure[3][3] = {{0, 1, 0}, {1, 1, 1}, {0, 1, 0}};
   unsigned char temp_image[BMP_WIDTH][BMP_HEIGHT];
 
+  unsigned char *eroded_imag1 = (unsigned char *) malloc(BMP_HEIGHT * BMP_WIDTH);
+  printf("Allocated %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *) eroded_imag1);
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
@@ -310,6 +309,7 @@ unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 
 int main(int argc, char **argv)
 {
+  //Af en eller anden grund kan der ikke køre mere end én timer ad gangen. Så afkommentere den funktion man nu gerne vil teste.
   //start = clock();
 
   if (argc != 3)
