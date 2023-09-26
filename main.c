@@ -15,6 +15,16 @@ unsigned int erosion_happened = 0;
 unsigned int optimal_Threshold;
 // unsigned int coordinate_index = 0;
 
+//Macro brugt til at analyse time execution.
+
+#define TIMER_start() clock_t start = clock();
+
+#define TIMER_stop(name) do { \
+    clock_t end = clock(); \
+    double time_taken = ((double) (end - start)) / CLOCKS_PER_SEC; \
+    printf("%stog: %f seconds\n", name, time_taken); \
+} while(0)
+
 typedef struct
 {
   unsigned int x;
@@ -300,25 +310,34 @@ unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 
 int main(int argc, char **argv)
 {
-  start = clock();
+  //start = clock();
 
   if (argc != 3)
   {
     fprintf(stderr, "Wrong main arguments. Use: %s <output file path> <output file path>\n", argv[0]);
     exit(1);
   }
-
+  //TIMER_start();
   read_bitmap(argv[1], input_image);
+  //TIMER_stop("Indlæsning af bitmap ");
 
+  //TIMER_start();
   grey_scale(input_image, grey_image);
+  //TIMER_stop("Grey Scale ");
 
+  //TIMER_start();
   binary_threshold(grey_image, black_white_image);
+  //TIMER_stop("Binary Threshold ");
 
+  TIMER_start();
   erode_and_detect_loop(black_white_image);
+  TIMER_stop("Erosion og detection ");
 
   //convert_2d_to_3d(removed_cells_image, output_image);
 
+  //TIMER_start();
   insert_marks_at_cell_locations(input_image);
+  //TIMER_stop("Indsætning af markering ");
 
   write_bitmap(input_image, argv[2]);
 
@@ -326,9 +345,9 @@ int main(int argc, char **argv)
 
   // printf("Done!\n");
   printf("På billedet var antallet af celler lig med: %d\n", amount_of_cells);
-  end = clock();
-  cpu_time_used = end - start;
-  printf("Total time: %f sec\n", cpu_time_used/CLOCKS_PER_SEC);
+  //end = clock();
+  //cpu_time_used = end - start;
+  //printf("Total time: %f sec\n", cpu_time_used/CLOCKS_PER_SEC);
   return 0;
 }
 
