@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include "cbmp.h"
 #include <string.h>
+#include <time.h>
+
+clock_t start, end;
+double cpu_time_used;
 
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
@@ -296,6 +300,7 @@ unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 
 int main(int argc, char **argv)
 {
+  start = clock();
 
   if (argc != 3)
   {
@@ -317,7 +322,13 @@ int main(int argc, char **argv)
 
   write_bitmap(input_image, argv[2]);
 
+
+
   // printf("Done!\n");
   printf("På billedet var antallet af celler lig med: %d\n", amount_of_cells);
+  end = clock();
+  cpu_time_used = end - start;
+  printf("Total time: %f sec\n", cpu_time_used/CLOCKS_PER_SEC);
   return 0;
 }
+
