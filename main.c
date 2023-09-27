@@ -7,7 +7,7 @@
 clock_t start, end;
 double cpu_time_used;
 
-unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
+unsigned char *eroded_image;
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 
 unsigned int amount_of_cells = 0;
@@ -113,19 +113,20 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
   }
 }
 
-void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT])
+void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char *eroded_image)
 {
   unsigned char erosion_done = 0;
   unsigned char erosion_structure[3][3] = {{0, 1, 0}, {1, 1, 1}, {0, 1, 0}};
-  unsigned char temp_image[BMP_WIDTH][BMP_HEIGHT];
+  //unsigned char temp_image[BMP_WIDTH][BMP_HEIGHT];
 
-  unsigned char *eroded_imag1 = (unsigned char *) malloc(BMP_HEIGHT * BMP_WIDTH);
-  printf("Allocated %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *) eroded_imag1);
+  unsigned char *temp_image = (unsigned char *) malloc(BMP_HEIGHT * BMP_WIDTH);
+  printf("Allocated %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *) temp_image);
+
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
     {
-      temp_image[x][y] = black_white_image[x][y];
+      temp_image[y * BMP_WIDTH + x] = black_white_image[x][y];
     }
   }
 
@@ -152,7 +153,7 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
       }
       if (shouldErode)
       {
-        temp_image[x][y] = 0;
+        temp_image[y * BMP_WIDTH + x] = 0;
         erosion_done = 1;
       }
     }
@@ -162,13 +163,14 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
     {
-      eroded_image[x][y] = temp_image[x][y];
+      eroded_image[y * BMP_WIDTH + x] = temp_image[y * BMP_WIDTH + x];
     }
   }
   erosion_happened = erosion_done;
+  free(temp_image);
 }
 
-void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT])
+void detect_cells(unsigned char *eroded_image, unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT])
 {
   unsigned char cell_detected = 0;
   unsigned char padded_image[BMP_WIDTH + 12][BMP_HEIGHT + 12];
@@ -178,7 +180,7 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
   {
     for (int y = 6; y < BMP_HEIGHT; y++)
     {
-      padded_image[x][y] = eroded_image[x][y];
+      padded_image[x][y] = eroded_image[y * BMP_WIDTH + x];
     }
   }
 
@@ -304,11 +306,12 @@ unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 unsigned char output_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
-unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 
 int main(int argc, char **argv)
 {
+  eroded_image = (unsigned char *) malloc(BMP_HEIGHT * BMP_WIDTH);
+  printf("Eroded Image allokeret %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *) eroded_image);
   //Af en eller anden grund kan der ikke køre mere end én timer ad gangen. Så afkommentere den funktion man nu gerne vil teste.
   //start = clock();
 
@@ -348,6 +351,7 @@ int main(int argc, char **argv)
   //end = clock();
   //cpu_time_used = end - start;
   //printf("Total time: %f sec\n", cpu_time_used/CLOCKS_PER_SEC);
+  free(eroded_image);
   return 0;
 }
 
