@@ -2,9 +2,12 @@
 #include <stdio.h>
 #include "cbmp.h"
 #include <string.h>
+#include <unistd.h>
+
 
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
+unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 unsigned char output_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 
 unsigned int amount_of_cells = 0;
@@ -93,9 +96,9 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
     }
   }
 
-  for (int x = 1; x < BMP_WIDTH - 1; x++)
+  for (int x = 0; x < BMP_WIDTH; x++)
   {
-    for (int y = 1; y < BMP_HEIGHT - 1; y++)
+    for (int y = 0; y < BMP_HEIGHT; y++)
     {
       unsigned char shouldErode = 0;
       for (signed char dx = -1; dx <= 1; dx++)
@@ -202,20 +205,6 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
   }
 }
 
-void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
-{
-  erode(black_white_image, eroded_image);
-  if (erosion_happened)
-  {
-    detect_cells(eroded_image, removed_cells_image);
-    erode_and_detect_loop(removed_cells_image);
-  }
-  else if (!erosion_happened)
-  {
-    printf("Alle celler er opdaget!\n");
-  }
-}
-
 void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
 {
   for (int i = 0; i < amount_of_cells; i++)
@@ -223,28 +212,62 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
     int base_x = coordinates[i].x;
     int base_y = coordinates[i].y;
 
-    for (int dx = -6; dx < 7; dx++)
+    for (int dx = -3; dx < 4; dx++)
     {
-      for (int dy = -6; dy < 7; dy++)
+      for (int dy = -3; dy < 4; dy++)
       {
         int x = base_x + dx;
         int y = base_y + dy;
 
         if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
         {
-          if (dx == -6 || dx == 6 || dy == -6 || dy == 6)
-          {
+          //if (dx == -6 || dx == 6 || dy == -6 || dy == 6)
+          //{
             input_image[x][y][0] = 255;
             input_image[x][y][1] = 0;
             input_image[x][y][2] = 0;
-          }
+          //}
         }
       }
     }
   }
 }
 
-unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
+void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], char * output_file_path)
+{
+  int sleep_time = 500000;
+  //erode and print
+  erode(black_white_image, eroded_image);
+  
+  if (erosion_happened)
+  {
+    //print the eroded image
+    convert_2d_to_3d(eroded_image, output_image);
+    write_bitmap(output_image, "output_images/LiveProcess.bmp");
+    //usleep(sleep_time);
+
+    //detect cells and print
+    detect_cells(eroded_image, removed_cells_image);
+    convert_2d_to_3d(removed_cells_image, output_image);
+    write_bitmap(output_image, "output_images/LiveProcess.bmp");
+    //usleep(sleep_time);
+
+    //insert marks and print
+    insert_marks_at_cell_locations(input_image);
+    write_bitmap(input_image, "output_images/LiveProcess.bmp");
+    //usleep(sleep_time);
+
+    //Recurse
+    erode_and_detect_loop(removed_cells_image, output_file_path);
+  }
+  else if (!erosion_happened)
+  {
+    insert_marks_at_cell_locations(input_image);
+    write_bitmap(input_image, output_file_path);
+    printf("Alle celler er opdaget!\n");
+  }
+}
+
 unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
@@ -265,15 +288,26 @@ int main(int argc, char **argv)
 
   binary_threshold(grey_image, black_white_image);
 
-  erode_and_detect_loop(black_white_image);
+  /*
+  while (erosion_happened)
+  {
+    erode(black_white_image, eroded_image);
+    detect_cells(eroded_image, removed_cells_image);
+    insert_marks_at_cell_locations(input_image);
+    write_bit
+    map(input_image, argv[2]);
+  }
+  */
+
+  erode_and_detect_loop(black_white_image, argv[2]);
+
+  // insert_marks_at_cell_locations(input_image);
 
   // convert_2d_to_3d(removed_cells_image, output_image);
 
-  insert_marks_at_cell_locations(input_image);
-
-  write_bitmap(input_image, argv[2]);
+  // write_bitmap(input_image, argv[2]);
 
   // printf("Done!\n");
-  printf("På billedet var antallet af celler lig med: %d\n", amount_of_cells);
+  printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
 }
