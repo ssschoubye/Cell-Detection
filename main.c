@@ -235,7 +235,7 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
 
 void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], char * output_file_path)
 {
-  int sleep_time = 500000;
+  int sleep_time = 1;
   //erode and print
   erode(black_white_image, eroded_image);
   
@@ -244,18 +244,18 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
     //print the eroded image
     convert_2d_to_3d(eroded_image, output_image);
     write_bitmap(output_image, "output_images/LiveProcess.bmp");
-    //usleep(sleep_time);
+    sleep(sleep_time);
 
     //detect cells and print
     detect_cells(eroded_image, removed_cells_image);
     convert_2d_to_3d(removed_cells_image, output_image);
     write_bitmap(output_image, "output_images/LiveProcess.bmp");
-    //usleep(sleep_time);
+    sleep(sleep_time);
 
     //insert marks and print
     insert_marks_at_cell_locations(input_image);
     write_bitmap(input_image, "output_images/LiveProcess.bmp");
-    //usleep(sleep_time);
+    sleep(sleep_time);
 
     //Recurse
     erode_and_detect_loop(removed_cells_image, output_file_path);
