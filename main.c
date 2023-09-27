@@ -4,7 +4,6 @@
 #include <string.h>
 #include <time.h>
 
-
 clock_t start, end;
 double cpu_time_used;
 
@@ -15,17 +14,17 @@ unsigned char *black_white_image;
 unsigned int amount_of_cells = 0;
 unsigned int erosion_happened = 0;
 unsigned int optimal_Threshold;
-// unsigned int coordinate_index = 0;
 
-//Macro brugt til at analyse time execution.
-
+// Macro brugt til at analyse time execution.
 #define TIMER_start() clock_t start = clock();
 
-#define TIMER_stop(name) do { \
-    clock_t end = clock(); \
-    double time_taken = ((double) (end - start)) / CLOCKS_PER_SEC; \
-    printf("%stog: %f seconds\n", name, time_taken); \
-} while(0)
+#define TIMER_stop(name)                                          \
+  do                                                              \
+  {                                                               \
+    clock_t end = clock();                                        \
+    double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC; \
+    printf("%stog: %f seconds\n", name, time_taken);              \
+  } while (0)
 
 typedef struct
 {
@@ -45,16 +44,44 @@ static inline int findMin(int a, int b)
   return a < b ? a : b;
 }
 
+// BUGFIXING/PRINT IMAGE FRAMEWORK --------------------------------------------------------------------------------------------------------------------------------
+
+unsigned int erode_step = 0;
+unsigned int detect_cells_step = 0;
+unsigned int insert_marks_step = 0;
+unsigned char eroded_image_step[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
+
+void convert_1D_to_3D(unsigned char *input_1D, unsigned char output_3D[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
+{
+  for (int x = 0; x < BMP_WIDTH; x++)
+  {
+    for (int y = 0; y < BMP_HEIGHT; y++)
+    {
+      output_3D[x][y][0] = input_1D[y * BMP_WIDTH + x];
+      output_3D[x][y][1] = input_1D[y * BMP_WIDTH + x];
+      output_3D[x][y][2] = input_1D[y * BMP_WIDTH + x];
+    }
+  }
+}
+
+void save_debug_image(unsigned char image_3D[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], const char *prefix, unsigned int step)
+{
+  char filename[50];
+  sprintf(filename, "detect_process/%s_step_%u.bmp", prefix, step);
+  write_bitmap(image_3D, filename);
+}
+
+// -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT])
 {
-  int freq_array[256]={0};
+  int freq_array[256] = {0};
   float bc_Variance;
   float prob1;
   float prob2;
   float mean1;
   float mean2;
-  unsigned int total_pixels = BMP_HEIGHT*BMP_WIDTH;
+  unsigned int total_pixels = BMP_HEIGHT * BMP_WIDTH;
   float findMaxBCVariance = 0.0;
   for (int x = 0; x < BMP_WIDTH; x++)
   {
@@ -66,44 +93,43 @@ void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], un
 
       unsigned char grey = (red + green + blue) / 3;
       // binray threshhold kan laves her. så kan man slippe for division, og for at lagre den midlertidige resultat grey_scale_image i et array
-      
+
       freq_array[grey]++;
       grey_scale_image[x][y] = grey;
     }
   }
-  for(int i=0; i <= 255; i++)
+  for (int i = 0; i <= 255; i++)
+  {
+    float count1 = 0.0;
+    float count2 = 0.0;
+    int sum1 = 0;
+    int sum2 = 0;
+
+    for (int j = 0; j <= 255; j++)
+    {
+      if (i >= j)
       {
-        float count1 = 0.0;
-        float count2 = 0.0;
-        int sum1 = 0;
-        int sum2 = 0;
-
-        for(int j =0; j <= 255; j++)
-        {
-          if(i >= j)
-          {
-            count1+= freq_array[j];
-            sum1 += j *freq_array[j];
-          }
-          else
-          {
-            count2+= freq_array[j];
-            sum2+= j*freq_array[j];
-            }
-        }
-          prob1 = count1 / (float)total_pixels;
-          prob2 = count2 / (float)total_pixels;
-          mean1 = (float)sum1 / count1;
-          mean2 = (float)sum2 / count2;
-          bc_Variance = prob1 * prob2 * (mean1-mean2)*(mean1-mean2);
-
-          if(bc_Variance > findMaxBCVariance)
-          {
-            findMaxBCVariance = bc_Variance;
-            optimal_Threshold = i;
-          }
+        count1 += freq_array[j];
+        sum1 += j * freq_array[j];
       }
-      
+      else
+      {
+        count2 += freq_array[j];
+        sum2 += j * freq_array[j];
+      }
+    }
+    prob1 = count1 / (float)total_pixels;
+    prob2 = count2 / (float)total_pixels;
+    mean1 = (float)sum1 / count1;
+    mean2 = (float)sum2 / count2;
+    bc_Variance = prob1 * prob2 * (mean1 - mean2) * (mean1 - mean2);
+
+    if (bc_Variance > findMaxBCVariance)
+    {
+      findMaxBCVariance = bc_Variance;
+      optimal_Threshold = i;
+    }
+  }
 }
 
 void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], unsigned char *black_white_image)
@@ -128,12 +154,18 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 
 void erode(unsigned char *black_white_image, unsigned char *eroded_image)
 {
+  // BUGFIX
+
+  erode_step++;
+
+  // ----------
+
   unsigned char erosion_done = 0;
   unsigned char erosion_structure[3][3] = {{0, 1, 0}, {1, 1, 1}, {0, 1, 0}};
-  //unsigned char temp_image[BMP_WIDTH][BMP_HEIGHT];
+  // unsigned char temp_image[BMP_WIDTH][BMP_HEIGHT];
 
-  unsigned char *temp_image = (unsigned char *) malloc(BMP_HEIGHT * BMP_WIDTH);
-  printf("Allocated %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *) temp_image);
+  unsigned char *temp_image = (unsigned char *)malloc(BMP_HEIGHT * BMP_WIDTH);
+  printf("Allocated %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *)temp_image);
 
   for (int x = 0; x < BMP_WIDTH; x++)
   {
@@ -152,7 +184,7 @@ void erode(unsigned char *black_white_image, unsigned char *eroded_image)
       {
         for (signed char dy = -1; dy <= 1; dy++)
         {
-          if (erosion_structure[dx + 1][dy + 1] == 1 && black_white_image[(y+dy)*BMP_WIDTH + (x + dx)] == 0)
+          if (erosion_structure[dx + 1][dy + 1] == 1 && black_white_image[(y + dy) * BMP_WIDTH + (x + dx)] == 0)
           {
             if (black_white_image[y * BMP_WIDTH + x] == 255)
             {
@@ -179,8 +211,14 @@ void erode(unsigned char *black_white_image, unsigned char *eroded_image)
       eroded_image[y * BMP_WIDTH + x] = temp_image[y * BMP_WIDTH + x];
     }
   }
+
   erosion_happened = erosion_done;
   free(temp_image);
+
+  // BUGFIX
+
+  convert_1D_to_3D(eroded_image,eroded_image_step);
+  save_debug_image(eroded_image_step,"erode",erode_step);
 }
 
 void detect_cells(unsigned char *eroded_image, unsigned char *removed_cells_image)
@@ -260,6 +298,7 @@ void erode_and_detect_loop(unsigned char *black_white_image)
   if (erosion_happened)
   {
     detect_cells(eroded_image, removed_cells_image);
+    insert_marks_at_cell_locations(input_image);
     erode_and_detect_loop(removed_cells_image);
   }
   else if (!erosion_happened)
@@ -274,27 +313,26 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
   {
     for (int dx = -8; dx < 9; dx++)
     {
-        int x = coordinates[i].x + dx;
-        int y = coordinates[i].y;
-        if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
-        {
-            input_image[x][y][0] = 255;
-            input_image[x][y][1] = 0;
-            input_image[x][y][2] = 0;
-        }
+      int x = coordinates[i].x + dx;
+      int y = coordinates[i].y;
+      if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
+      {
+        input_image[x][y][0] = 255;
+        input_image[x][y][1] = 0;
+        input_image[x][y][2] = 0;
+      }
     }
     for (int dy = -8; dy < 9; dy++)
+    {
+      int x = coordinates[i].x;
+      int y = coordinates[i].y + dy;
+      if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
       {
-        int x = coordinates[i].x;
-        int y = coordinates[i].y + dy;
-        if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
-        {
-            input_image[x][y][0] = 255;
-            input_image[x][y][1] = 0;
-            input_image[x][y][2] = 0;
-          
-        }
+        input_image[x][y][0] = 255;
+        input_image[x][y][1] = 0;
+        input_image[x][y][2] = 0;
       }
+    }
   }
 }
 
@@ -315,55 +353,51 @@ unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 unsigned char output_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
 
-
 int main(int argc, char **argv)
 {
-  eroded_image = (unsigned char *) malloc(BMP_HEIGHT * BMP_WIDTH);
-  printf("Eroded Image allokeret %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *) eroded_image);
-  removed_cells_image = (unsigned char *) malloc(BMP_HEIGHT * BMP_WIDTH);
-  printf("Remove Cells allokeret %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *) removed_cells_image);
-  black_white_image = (unsigned char *) malloc(BMP_HEIGHT * BMP_WIDTH);
-  printf("Black and White image allokeret %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *) black_white_image);
-  //Af en eller anden grund kan der ikke køre mere end én timer ad gangen. Så afkommentere den funktion man nu gerne vil teste.
-  //start = clock();
+  eroded_image = (unsigned char *)malloc(BMP_HEIGHT * BMP_WIDTH);
+  printf("Eroded Image allokeret %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *)eroded_image);
+  removed_cells_image = (unsigned char *)malloc(BMP_HEIGHT * BMP_WIDTH);
+  printf("Remove Cells allokeret %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *)removed_cells_image);
+  black_white_image = (unsigned char *)malloc(BMP_HEIGHT * BMP_WIDTH);
+  printf("Black and White image allokeret %zu bytes at address %p\n", BMP_HEIGHT * BMP_WIDTH, (void *)black_white_image);
+  // Af en eller anden grund kan der ikke køre mere end én timer ad gangen. Så afkommentere den funktion man nu gerne vil teste.
+  // start = clock();
 
   if (argc != 3)
   {
     fprintf(stderr, "Wrong main arguments. Use: %s <output file path> <output file path>\n", argv[0]);
     exit(1);
   }
-  //TIMER_start();
+  // TIMER_start();
   read_bitmap(argv[1], input_image);
-  //TIMER_stop("Indlæsning af bitmap ");
+  // TIMER_stop("Indlæsning af bitmap ");
 
-  //TIMER_start();
+  // TIMER_start();
   grey_scale(input_image, grey_image);
-  //TIMER_stop("Grey Scale ");
+  // TIMER_stop("Grey Scale ");
 
-  //TIMER_start();
+  // TIMER_start();
   binary_threshold(grey_image, black_white_image);
-  //TIMER_stop("Binary Threshold ");
+  // TIMER_stop("Binary Threshold ");
 
   TIMER_start();
   erode_and_detect_loop(black_white_image);
   TIMER_stop("Erosion og detection ");
 
-  //convert_2d_to_3d(removed_cells_image, output_image);
+  // convert_2d_to_3d(removed_cells_image, output_image);
 
-  //TIMER_start();
-  insert_marks_at_cell_locations(input_image);
-  //TIMER_stop("Indsætning af markering ");
+  // TIMER_start();
+  // insert_marks_at_cell_locations(input_image);
+  // TIMER_stop("Indsætning af markering ");
 
   write_bitmap(input_image, argv[2]);
 
-
-
   // printf("Done!\n");
   printf("På billedet var antallet af celler lig med: %d\n", amount_of_cells);
-  //end = clock();
-  //cpu_time_used = end - start;
-  //printf("Total time: %f sec\n", cpu_time_used/CLOCKS_PER_SEC);
+  // end = clock();
+  // cpu_time_used = end - start;
+  // printf("Total time: %f sec\n", cpu_time_used/CLOCKS_PER_SEC);
   free(eroded_image);
   return 0;
 }
-
