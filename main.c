@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 
+
 clock_t start, end;
 double cpu_time_used;
 
@@ -34,6 +35,17 @@ typedef struct
 
 Coordinate coordinates[1000];
 
+static inline int findMax(int a, int b)
+{
+  return a > b ? a : b;
+}
+
+static inline int findMin(int a, int b)
+{
+  return a < b ? a : b;
+}
+
+
 void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT])
 {
   int freq_array[256]={0};
@@ -43,7 +55,7 @@ void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], un
   float mean1;
   float mean2;
   unsigned int total_pixels = BMP_HEIGHT*BMP_WIDTH;
-  float maxBCVariance = 0.0;
+  float findMaxBCVariance = 0.0;
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
@@ -85,9 +97,9 @@ void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], un
           mean2 = (float)sum2 / count2;
           bc_Variance = prob1 * prob2 * (mean1-mean2)*(mean1-mean2);
 
-          if(bc_Variance > maxBCVariance)
+          if(bc_Variance > findMaxBCVariance)
           {
-            maxBCVariance = bc_Variance;
+            findMaxBCVariance = bc_Variance;
             optimal_Threshold = i;
           }
       }
@@ -174,74 +186,70 @@ void erode(unsigned char *black_white_image, unsigned char *eroded_image)
 void detect_cells(unsigned char *eroded_image, unsigned char *removed_cells_image)
 {
   unsigned char cell_detected = 0;
-  unsigned char padded_image[BMP_WIDTH + 12][BMP_HEIGHT + 12];
-  memset(padded_image, 0, sizeof(padded_image)); // fylder padded_image med 0'er
 
-  for (int x = 6; x < BMP_WIDTH; x++)
+  for (int x = 0; x < BMP_WIDTH; x++)
   {
-    for (int y = 6; y < BMP_HEIGHT; y++)
+    for (int y = 0; y < BMP_HEIGHT; y++)
     {
-      padded_image[x][y] = eroded_image[y * BMP_WIDTH + x];
-    }
-  }
-
-  for (int x = 5; x <= BMP_WIDTH - 5; x++)
-  {
-    for (int y = 5; y <= BMP_HEIGHT - 5; y++)
-    {
-      unsigned char white_in_inner_square = 0;
-      unsigned char white_in_outer_square = 0;
-      for (signed char dx = -6; dx < 6; dx++)
+      if (eroded_image[y * BMP_WIDTH + x] == 255)
       {
-        for (signed char dy = -6; dy < 6; dy++)
+        unsigned char white_in_inner_square = 0;
+        unsigned char white_in_outer_square = 0;
+
+        int findMin_dx = findMax(-6, -x);
+        int findMax_dx = findMin(6, BMP_WIDTH - x - 1);
+        int findMin_dy = findMax(-6, -y);
+        int findMax_dy = findMin(6, BMP_HEIGHT - y - 1);
+
+        for (int dx = findMin_dx; dx <= findMax_dx; dx++)
         {
-          if (padded_image[x + dx][y + dy] == 255)
+          for (int dy = findMin_dy; dy <= findMax_dy; dy++)
           {
-            // Tjek den indre og ydre firkant
-            if (-5 <= dx && dx <= 4 && -5 <= dy && dy <= 4)
+            int newX = x + dx;
+            int newY = y + dy;
+
+            if (eroded_image[newY * BMP_WIDTH + newX] == 255)
             {
-              white_in_inner_square = 1;
-            }
-            if (dx == -6 || dx == 5 || dy == -6 || dy == 5)
-            {
-              white_in_outer_square = 1;
+              if (findMin_dx <= dx && dx <= findMax_dx && findMin_dy <= dy && dy <= findMax_dy)
+              {
+                if (abs(dx) <= 5 && abs(dy) <= 5)
+                {
+                  white_in_inner_square = 1;
+                }
+                if (abs(dx) == 6 || abs(dy) == 6)
+                {
+                  white_in_outer_square = 1;
+                }
+              }
             }
           }
         }
+
         if (white_in_inner_square == 1 && white_in_outer_square == 0)
         {
-          cell_detected = 1;
-        }
-        else
-        {
-          cell_detected = 0;
-        }
-      }
-      // Farv den indre firkant sort, hvis en celle bliver fundet
-      if (cell_detected)
-      {
-        coordinates[amount_of_cells].x = x;
-        coordinates[amount_of_cells].y = y;
-        printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells + 1, coordinates[amount_of_cells].x, coordinates[amount_of_cells].y);
-        amount_of_cells++;
-        // coordinate_index++;
-        for (signed char dx = -5; dx < 5; dx++)
-        {
-          for (signed char dy = -5; dy < 5; dy++)
+          amount_of_cells++;
+          coordinates[amount_of_cells - 1].x = x;
+          coordinates[amount_of_cells - 1].y = y;
+          printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells, coordinates[amount_of_cells - 1].x, coordinates[amount_of_cells - 1].y);
+
+          for (int dx = findMax(-5, -x); dx <= findMin(5, BMP_WIDTH - x - 1); dx++)
           {
-            padded_image[x + dx][y + dy] = 0;
+            for (int dy = findMax(-5, -y); dy <= findMin(5, BMP_HEIGHT - y - 1); dy++)
+            {
+              int newX = x + dx;
+              int newY = y + dy;
+              eroded_image[newY * BMP_WIDTH + newX] = 0;
+            }
           }
         }
-        // y += 6; // Alle celler bliver indfanget af detectoren, når vi hopper 6 pixels frem, så vi ikke tjekker samme område flere gange end nødvendigt.
       }
     }
-    // x += 6;
   }
-  for (int x = 6; x < BMP_WIDTH; x++)
+  for (int x = 0; x < BMP_WIDTH; x++)
   {
-    for (int y = 6; y < BMP_HEIGHT; y++)
+    for (int y = 0; y < BMP_HEIGHT; y++)
     {
-      removed_cells_image[y * BMP_WIDTH + x] = padded_image[x][y];
+      removed_cells_image[y * BMP_WIDTH + x] = eroded_image[y * BMP_WIDTH + x];
     }
   }
 }
