@@ -8,8 +8,7 @@ unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char output_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 
 unsigned int amount_of_cells = 0;
-unsigned int erosion_happened = 0;
-int counter = 1; // counter til at lave eroded images
+unsigned int erosion_happened;
 
 typedef struct
 {
@@ -81,7 +80,7 @@ void convert_2d_to_3d(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 
 void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT])
 {
-  unsigned char erosion_done = 0;
+  erosion_happened = 0;
   unsigned char erosion_structure[3][3] = {{0, 1, 0}, {1, 1, 1}, {0, 1, 0}};
   unsigned char temp_image[BMP_WIDTH][BMP_HEIGHT];
   char filename[50];
@@ -118,7 +117,7 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
       if (shouldErode)
       {
         temp_image[x][y] = 0;
-        erosion_done = 1;
+        erosion_happened = 1;
       }
     }
   }
@@ -130,10 +129,6 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
       eroded_image[x][y] = temp_image[x][y];
     }
   }
-  // convert_2d_to_3d(temp_image, output_image);
-  // sprintf(filename, "eroded_images/eroded_image_%d.bmp", counter);
-  // write_bitmap(output_image, filename);
-  // counter++;
 }
 
 void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT])
@@ -183,7 +178,7 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
           amount_of_cells++;
           coordinates[amount_of_cells - 1].x = x;
           coordinates[amount_of_cells - 1].y = y;
-          printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells, coordinates[amount_of_cells].x, coordinates[amount_of_cells].y);
+          printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells, coordinates[amount_of_cells - 1].x, coordinates[amount_of_cells - 1].y);
 
           for (int dx = max(-5, -x); dx <= min(5, BMP_WIDTH - x - 1); dx++)
           {
