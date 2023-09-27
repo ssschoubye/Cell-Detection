@@ -254,6 +254,7 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
   }
 }
 
+
 void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
   erode(black_white_image, eroded_image);
