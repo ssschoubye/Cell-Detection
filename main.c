@@ -222,7 +222,7 @@ void detect_cells(unsigned char *eroded_image, unsigned char *removed_cells_imag
       {
         coordinates[amount_of_cells].x = x;
         coordinates[amount_of_cells].y = y;
-        //printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells + 1, coordinates[amount_of_cells].x, coordinates[amount_of_cells].y);
+        printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells + 1, coordinates[amount_of_cells].x, coordinates[amount_of_cells].y);
         amount_of_cells++;
         // coordinate_index++;
         for (signed char dx = -5; dx < 5; dx++)
