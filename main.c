@@ -20,12 +20,12 @@ typedef struct
 
 typedef struct
 {
-  int points[BMP_HEIGHT * BMP_WIDTH][2];
+  Coordinate points[1000];
   int count;
 } Cluster;
 
 Coordinate coordinates[1000];
-Cluster clusters[300];
+Cluster clusters[100];
 int clusterCount = 0;
 
 Coordinate queue[BMP_WIDTH * BMP_HEIGHT];
@@ -104,7 +104,8 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 
 void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
-  int Area[BMP_WIDTH * BMP_HEIGHT][2];
+  printf("clusters start");
+  Coordinate Area[1000];
   int count = 0;
   int visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
 
@@ -131,8 +132,8 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
                 int currentY = p.y + dy;
                 if (black_white_image[currentX][currentY] == 255 && visited[currentX][currentY] == 0)
                 {
-                  Area[count][0] = currentX;
-                  Area[count][1] = currentY;
+                  Area[count].x = currentX;
+                  Area[count].y = currentY;
                   count++;
                   enqueue(currentX, currentY);
                   visited[currentX][currentY] = 1;
@@ -154,10 +155,10 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
             // Her sætter vi tersklen til 400. Vi har talt, og nogen enkelte celler er lidt større end 400, og nogle clusters er lidt mindre end 400.
             // Men det virker som en fin value indtil videre, da det er bedre at betragte noget som et cluster, selvom det ikke er det,
             // end at ikke behandle noget som et cluster, når det er det
-            for (int k = 0; k < count; k++)
+            for (int point = 0; point < count; point++)
             {
-              clusters[clusterCount].points[k][0] = Area[k][0];
-              clusters[clusterCount].points[k][1] = Area[k][1];
+              clusters[clusterCount].points[point].x = Area[point].x;
+              clusters[clusterCount].points[point].y = Area[point].y;
             }
             clusters[clusterCount].count = count;
             clusterCount++;
@@ -166,10 +167,8 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
           // Count og Area wipes
           for (int i = 0; i < count; i++)
           {
-            for (int j = 0; j < 2; j++)
-            {
-              Area[i][j] = 0;
-            }
+              Area[i].x = 0;
+              Area[i].y = 0;
           }
           count = 0;
         }
@@ -352,13 +351,14 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
   {
     for (int currentCoordinate = 0; currentCoordinate < clusters[clusterCount].count; currentCoordinate++)
     {
-      currentX = clusters[clusterCount].points[currentCoordinate][0];
-      currentY = clusters[clusterCount].points[currentCoordinate][1];
+      currentX = clusters[clusterCount].points[currentCoordinate].x;
+      currentY = clusters[clusterCount].points[currentCoordinate].y;
 
       input_image[currentX][currentY][1] = 255;
     }
   }
 }
+
 
 void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], char *output_file_path)
 {
@@ -395,6 +395,7 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
   }
 }
 
+
 unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
@@ -415,32 +416,16 @@ int main(int argc, char **argv)
 
   binary_threshold(grey_image, black_white_image);
 
+  printf("foer clusters");
   find_cell_clusters(black_white_image);
 
   paint_clusters_green(input_image);
 
   write_bitmap(input_image, argv[2]);
 
-  /*
-  while (erosion_happened)
-  {
-    erode(black_white_image, eroded_image);
-    detect_cells(eroded_image, removed_cells_image);
-    insert_marks_at_cell_locations(input_image);
-    write_bit
-    map(input_image, argv[2]);
-  }
-  */
-
   // erode_and_detect_loop(black_white_image, argv[2]);
 
-  // insert_marks_at_cell_locations(input_image);
 
-  // convert_2d_to_3d(removed_cells_image, output_image);
-
-  // write_bitmap(input_image, argv[2]);
-
-  // printf("Done!\n");
   printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
 }
