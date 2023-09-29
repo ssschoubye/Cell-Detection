@@ -4,7 +4,6 @@
 #include <string.h>
 #include <unistd.h>
 
-
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
@@ -19,7 +18,35 @@ typedef struct
   unsigned int y;
 } Coordinate;
 
+typedef struct
+{
+  int points[BMP_HEIGHT * BMP_WIDTH][2];
+  int count;
+} Cluster;
+
 Coordinate coordinates[1000];
+Cluster clusters[100];
+int clusterCount = 0;
+
+Coordinate queue[BMP_WIDTH * BMP_HEIGHT];
+int front = 0, rear = -1;
+
+void enqueue(int x, int y)
+{
+  rear++;
+  queue[rear].x = x;
+  queue[rear].y = y;
+}
+
+Coordinate dequeue()
+{
+  return queue[front++];
+}
+
+int isEmpty()
+{
+  return front > rear;
+}
 
 static inline int max(int a, int b)
 {
@@ -63,6 +90,79 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
       else
       {
         black_white_image[x][y] = 255;
+      }
+    }
+  }
+}
+
+void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
+{
+  int Area[BMP_WIDTH * BMP_HEIGHT][2];
+  int count = 0;
+  int visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
+
+  for (int x = 0; x < BMP_WIDTH; x++)
+  {
+    for (int y = 0; y < BMP_HEIGHT; y++)
+    {
+      if (black_white_image[x][y] == 255 && visited[x][y] == 0)
+      {
+        // Et punkt bliver fundet, vi tilføjer det til queue og starter vores while loop som finder alle hvide naboer iterativt
+        enqueue(x, y);
+        while (!isEmpty())
+        {
+          // Vi dequeuer de fundne punkt, og bruger det som centrum i vores search structure
+          Coordinate p = dequeue();
+
+          for (int dx = -1; dx <= 1; dx++)
+          {
+            for (int dy = -1; dy <= 1; dy++)
+            {
+              int currentX = p.x + dx;
+              int currentY = p.y + dy;
+              if (black_white_image[currentX][currentY] == 255 && visited[currentX][currentY] == 0)
+              {
+                Area[count][0] = currentX;
+                Area[count][1] = currentY;
+                count++;
+                enqueue(currentX, currentY);
+                visited[currentX][currentY] = 1;
+              }
+            }
+          }
+        }
+
+        // TODO fjern duplicates fra area. Vi har valgt ikke at gøre dette, fordi celler ikke bliver tilføjet til area, hvis de er visited.
+        // Og det er igen bedre at tælle noget som et cluster, selvom det ikke er, end omvendt.
+
+        // Her er alle celler i cluster opdaget
+        if (isEmpty())
+        {
+          // Så her gemmer vi clusteret, alle dets coordinates og antallet af pixels i clusteret
+          if (sizeof(Area) >= 400)
+          {
+            // Her sætter vi tersklen til 400. Vi har talt, og nogen enkelte celler er lidt større end 400, og nogle clusters er lidt mindre end 400.
+            // Men det virker som en fin value indtil videre, da det er bedre at betragte noget som et cluster, selvom det ikke er det,
+            // end at ikke behandle noget som et cluster, når det er det
+            for (int k = 0; k < count; k++)
+            {
+              clusters[clusterCount].points[k][0] = Area[k][0];
+              clusters[clusterCount].points[k][1] = Area[k][1];
+            }
+            clusters[clusterCount].count = count;
+            clusterCount++;
+          }
+
+          // Count og Area wipes
+          count = 0;
+          for (x = 0; x < BMP_WIDTH * BMP_HEIGHT; x++)
+          {
+            for (y = 0; y < 2; y++)
+            {
+              Area[x][y] = 0;
+            }
+          }
+        }
       }
     }
   }
@@ -221,11 +321,11 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
 
         if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
         {
-          //if (dx == -6 || dx == 6 || dy == -6 || dy == 6)
+          // if (dx == -6 || dx == 6 || dy == -6 || dy == 6)
           //{
-            input_image[x][y][0] = 255;
-            input_image[x][y][1] = 0;
-            input_image[x][y][2] = 0;
+          input_image[x][y][0] = 255;
+          input_image[x][y][1] = 0;
+          input_image[x][y][2] = 0;
           //}
         }
       }
@@ -233,31 +333,46 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
   }
 }
 
-void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], char * output_file_path)
+void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
+{
+  int currentX;
+  int currentY;
+
+  for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++){
+    for (int currentCoordinate = 0; currentCoordinate < clusters[clusterCount].count; currentCoordinate++){
+      currentX = clusters[clusterCount].points[currentCoordinate][0];
+      currentY = clusters[clusterCount].points[currentCoordinate][1];
+
+      input_image[currentX][currentY][1] = 255;
+    }
+  }
+}
+
+void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], char *output_file_path)
 {
   int sleep_time = 1;
-  //erode and print
+  // erode and print
   erode(black_white_image, eroded_image);
-  
+
   if (erosion_happened)
   {
-    //print the eroded image
+    // print the eroded image
     convert_2d_to_3d(eroded_image, output_image);
     write_bitmap(output_image, "output_images/LiveProcess.bmp");
     sleep(sleep_time);
 
-    //detect cells and print
+    // detect cells and print
     detect_cells(eroded_image, removed_cells_image);
     convert_2d_to_3d(removed_cells_image, output_image);
     write_bitmap(output_image, "output_images/LiveProcess.bmp");
     sleep(sleep_time);
 
-    //insert marks and print
+    // insert marks and print
     insert_marks_at_cell_locations(input_image);
     write_bitmap(input_image, "output_images/LiveProcess.bmp");
     sleep(sleep_time);
 
-    //Recurse
+    // Recurse
     erode_and_detect_loop(removed_cells_image, output_file_path);
   }
   else if (!erosion_happened)
@@ -288,6 +403,12 @@ int main(int argc, char **argv)
 
   binary_threshold(grey_image, black_white_image);
 
+  find_cell_clusters(black_white_image);
+
+  paint_clusters_green(input_image);
+
+  write_bitmap(input_image, argv[2]);
+
   /*
   while (erosion_happened)
   {
@@ -299,7 +420,7 @@ int main(int argc, char **argv)
   }
   */
 
-  erode_and_detect_loop(black_white_image, argv[2]);
+  //erode_and_detect_loop(black_white_image, argv[2]);
 
   // insert_marks_at_cell_locations(input_image);
 
