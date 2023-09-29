@@ -25,7 +25,7 @@ typedef struct
 } Cluster;
 
 Coordinate coordinates[1000];
-Cluster clusters[100];
+Cluster clusters[300];
 int clusterCount = 0;
 
 Coordinate queue[BMP_WIDTH * BMP_HEIGHT];
@@ -118,15 +118,18 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
           {
             for (int dy = -1; dy <= 1; dy++)
             {
-              int currentX = p.x + dx;
-              int currentY = p.y + dy;
-              if (black_white_image[currentX][currentY] == 255 && visited[currentX][currentY] == 0)
+              if (p.x + dx < BMP_WIDTH && p.x + dx > 0 && p.y + dy < BMP_HEIGHT && p.y + dy > 0)
               {
-                Area[count][0] = currentX;
-                Area[count][1] = currentY;
-                count++;
-                enqueue(currentX, currentY);
-                visited[currentX][currentY] = 1;
+                int currentX = p.x + dx;
+                int currentY = p.y + dy;
+                if (black_white_image[currentX][currentY] == 255 && visited[currentX][currentY] == 0)
+                {
+                  Area[count][0] = currentX;
+                  Area[count][1] = currentY;
+                  count++;
+                  enqueue(currentX, currentY);
+                  visited[currentX][currentY] = 1;
+                }
               }
             }
           }
@@ -338,8 +341,10 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
   int currentX;
   int currentY;
 
-  for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++){
-    for (int currentCoordinate = 0; currentCoordinate < clusters[clusterCount].count; currentCoordinate++){
+  for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++)
+  {
+    for (int currentCoordinate = 0; currentCoordinate < clusters[clusterCount].count; currentCoordinate++)
+    {
       currentX = clusters[clusterCount].points[currentCoordinate][0];
       currentY = clusters[clusterCount].points[currentCoordinate][1];
 
@@ -420,7 +425,7 @@ int main(int argc, char **argv)
   }
   */
 
-  //erode_and_detect_loop(black_white_image, argv[2]);
+  // erode_and_detect_loop(black_white_image, argv[2]);
 
   // insert_marks_at_cell_locations(input_image);
 
