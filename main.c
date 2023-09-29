@@ -33,9 +33,16 @@ int front = 0, rear = -1;
 
 void enqueue(int x, int y)
 {
-  rear++;
-  queue[rear].x = x;
-  queue[rear].y = y;
+  if (rear < BMP_WIDTH * BMP_HEIGHT - 1)
+  {
+    rear++;
+    queue[rear].x = x;
+    queue[rear].y = y;
+  }
+  else
+  {
+    printf("Overflow error");
+  }
 }
 
 Coordinate dequeue()
@@ -118,7 +125,7 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
           {
             for (int dy = -1; dy <= 1; dy++)
             {
-              if (p.x + dx < BMP_WIDTH && p.x + dx > 0 && p.y + dy < BMP_HEIGHT && p.y + dy > 0)
+              if (p.x + dx < BMP_WIDTH && p.x + dx >= 0 && p.y + dy < BMP_HEIGHT && p.y + dy >= 0)
               {
                 int currentX = p.x + dx;
                 int currentY = p.y + dy;
@@ -142,7 +149,7 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
         if (isEmpty())
         {
           // Så her gemmer vi clusteret, alle dets coordinates og antallet af pixels i clusteret
-          if (sizeof(Area) >= 400)
+          if (count >= 400)
           {
             // Her sætter vi tersklen til 400. Vi har talt, og nogen enkelte celler er lidt større end 400, og nogle clusters er lidt mindre end 400.
             // Men det virker som en fin value indtil videre, da det er bedre at betragte noget som et cluster, selvom det ikke er det,
@@ -157,14 +164,14 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
           }
 
           // Count og Area wipes
-          count = 0;
-          for (x = 0; x < BMP_WIDTH * BMP_HEIGHT; x++)
+          for (int i = 0; i < count; i++)
           {
-            for (y = 0; y < 2; y++)
+            for (int j = 0; j < 2; j++)
             {
-              Area[x][y] = 0;
+              Area[i][j] = 0;
             }
           }
+          count = 0;
         }
       }
     }
