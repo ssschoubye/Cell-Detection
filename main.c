@@ -104,10 +104,10 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 
 void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
-  printf("clusters start");
+  printf("clusters start\n");
   Coordinate Area[1000];
   int count = 0;
-  int visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
+  unsigned char visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
 
   for (int x = 0; x < BMP_WIDTH; x++)
   {
@@ -135,6 +135,7 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
                   Area[count].x = currentX;
                   Area[count].y = currentY;
                   count++;
+                  // printf("%d cluster pixels fundet\n", count);
                   enqueue(currentX, currentY);
                   visited[currentX][currentY] = 1;
                 }
@@ -149,8 +150,9 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
         // Her er alle celler i cluster opdaget
         if (isEmpty())
         {
+          printf("Cluster registrering begyndt\n");
           // Så her gemmer vi clusteret, alle dets coordinates og antallet af pixels i clusteret
-          if (count >= 400)
+          if (count >= 350)
           {
             // Her sætter vi tersklen til 400. Vi har talt, og nogen enkelte celler er lidt større end 400, og nogle clusters er lidt mindre end 400.
             // Men det virker som en fin value indtil videre, da det er bedre at betragte noget som et cluster, selvom det ikke er det,
@@ -161,14 +163,17 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
               clusters[clusterCount].points[point].y = Area[point].y;
             }
             clusters[clusterCount].count = count;
+            printf("Count = %d\n", count);
+            printf("Cluster %d bestaar af %d celler\n", clusterCount, clusters[clusterCount].count);
             clusterCount++;
+            printf("%d Clustere registreret\n", clusterCount);
           }
 
           // Count og Area wipes
           for (int i = 0; i < count; i++)
           {
-              Area[i].x = 0;
-              Area[i].y = 0;
+            Area[i].x = 0;
+            Area[i].y = 0;
           }
           count = 0;
         }
@@ -347,18 +352,24 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
   int currentX;
   int currentY;
 
+  printf("cluster painting begyndt\n");
+  printf("antallet af clusters er %d \n", clusterCount);
+
   for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++)
   {
+    printf("Antallet af celler i cluster %d er %d\n", currentCluster, clusters[clusterCount].count);
     for (int currentCoordinate = 0; currentCoordinate < clusters[clusterCount].count; currentCoordinate++)
     {
       currentX = clusters[clusterCount].points[currentCoordinate].x;
       currentY = clusters[clusterCount].points[currentCoordinate].y;
 
+      printf("%d\n", currentX);
+      printf("%d\n", currentY);
+
       input_image[currentX][currentY][1] = 255;
     }
   }
 }
-
 
 void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], char *output_file_path)
 {
@@ -395,7 +406,6 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
   }
 }
 
-
 unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
@@ -416,7 +426,7 @@ int main(int argc, char **argv)
 
   binary_threshold(grey_image, black_white_image);
 
-  printf("foer clusters");
+  printf("foer clusters\n");
   find_cell_clusters(black_white_image);
 
   paint_clusters_green(input_image);
@@ -424,7 +434,6 @@ int main(int argc, char **argv)
   write_bitmap(input_image, argv[2]);
 
   // erode_and_detect_loop(black_white_image, argv[2]);
-
 
   printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
