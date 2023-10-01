@@ -10,9 +10,20 @@ unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
 unsigned char output_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
+unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
 
 unsigned int amount_of_cells = 0;
 unsigned int erosion_happened;
+unsigned int optimal_Threshold;
+
+//Makroer til at udføre time execution analyse. 
+#define TIMER_start() clock_t start = clock();
+
+#define TIMER_stop(name) do { \
+    clock_t end = clock(); \
+    double time_taken = ((double) (end - start)) / CLOCKS_PER_SEC; \
+    printf("%stog: %f seconds\n", name, time_taken); \
+} while(0)
 
 typedef struct
 {
@@ -34,6 +45,8 @@ typedef struct
   int boundaryCount;
   ComplexCoordinate smoothedBoundary[10000];
 } Cluster;
+
+
 
 Coordinate coordinates[1000];
 Cluster clusters[300];
@@ -83,8 +96,16 @@ static inline int min(int a, int b)
   return a < b ? a : b;
 }
 
-void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT])
+void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT])
 {
+  int freq_array[256]={0};
+  float bc_Variance;
+  float prob1;
+  float prob2;
+  float mean1;
+  float mean2;
+  unsigned int total_pixels = BMP_HEIGHT*BMP_WIDTH;
+  float findMaxBCVariance = 0.0;
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
@@ -95,19 +116,52 @@ void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], un
 
       unsigned char grey = (red + green + blue) / 3;
 
-      grey_scale_image[x][y] = grey;
+      freq_array[grey]++;
+      grey_image[x][y] = grey;
     }
   }
+  for(int i=0; i <= 255; i++)
+      {
+        float count1 = 0.0;
+        float count2 = 0.0;
+        int sum1 = 0;
+        int sum2 = 0;
+
+        for(int j =0; j <= 255; j++)
+        {
+          if(i >= j)
+          {
+            count1+= freq_array[j];
+            sum1 += j *freq_array[j];
+          }
+          else
+          {
+            count2+= freq_array[j];
+            sum2+= j*freq_array[j];
+            }
+        }
+          prob1 = count1 / (float)total_pixels;
+          prob2 = count2 / (float)total_pixels;
+          mean1 = (float)sum1 / count1;
+          mean2 = (float)sum2 / count2;
+          bc_Variance = prob1 * prob2 * (mean1-mean2)*(mean1-mean2);
+
+          if(bc_Variance > findMaxBCVariance)
+          {
+            findMaxBCVariance = bc_Variance;
+            optimal_Threshold = i;
+          }
+      }
 }
 
-void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
+void binary_threshold(unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT], unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
     {
       unsigned char threshold = 90;
-      if (grey_scale_image[x][y] <= threshold)
+      if (grey_image[x][y] <= optimal_Threshold)
       {
         black_white_image[x][y] = 0;
       }
@@ -281,15 +335,15 @@ void boundary_to_freq_domain(Cluster *cluster)
 
  */
 
-void convert_2d_to_3d(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
+void convert_2d_to_3d(unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT], unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
 {
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
     {
-      rgb_image[x][y][0] = grey_scale_image[x][y];
-      rgb_image[x][y][1] = grey_scale_image[x][y];
-      rgb_image[x][y][2] = grey_scale_image[x][y];
+      rgb_image[x][y][0] = grey_image[x][y];
+      rgb_image[x][y][1] = grey_image[x][y];
+      rgb_image[x][y][2] = grey_image[x][y];
     }
   }
 }
@@ -551,7 +605,7 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
   }
 }
 
-unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
+
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 Cluster currentCluster;
