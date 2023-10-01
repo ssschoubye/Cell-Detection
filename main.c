@@ -20,12 +20,12 @@ typedef struct
 
 typedef struct
 {
-  Coordinate points[1000];
+  Coordinate points[10000];
   int count;
 } Cluster;
 
 Coordinate coordinates[1000];
-Cluster clusters[100];
+Cluster clusters[300];
 int clusterCount = 0;
 
 Coordinate queue[BMP_WIDTH * BMP_HEIGHT];
@@ -105,16 +105,19 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
   printf("clusters start\n");
-  Coordinate Area[1000];
+  Coordinate Area[10000];
   int count = 0;
   unsigned char visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
+  unsigned char clusterFound;
 
   for (int x = 0; x < BMP_WIDTH; x++)
   {
+    clusterFound = 0;
     for (int y = 0; y < BMP_HEIGHT; y++)
     {
       if (black_white_image[x][y] == 255 && visited[x][y] == 0)
       {
+        
         // Et punkt bliver fundet, vi tilføjer det til queue og starter vores while loop som finder alle hvide naboer iterativt
         enqueue(x, y);
         while (!isEmpty())
@@ -142,13 +145,14 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
               }
             }
           }
+          clusterFound = 1;
         }
 
         // TODO fjern duplicates fra area. Vi har valgt ikke at gøre dette, fordi celler ikke bliver tilføjet til area, hvis de er visited.
         // Og det er igen bedre at tælle noget som et cluster, selvom det ikke er, end omvendt.
 
         // Her er alle celler i cluster opdaget
-        if (isEmpty())
+        if (isEmpty() && clusterFound ==1)
         {
           printf("Cluster registrering begyndt\n");
           // Så her gemmer vi clusteret, alle dets coordinates og antallet af pixels i clusteret
@@ -164,7 +168,7 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
             }
             clusters[clusterCount].count = count;
             printf("Count = %d\n", count);
-            printf("Cluster %d bestaar af %d celler\n", clusterCount, clusters[clusterCount].count);
+            printf("Cluster %d bestaar af %d pixels\n", clusterCount, clusters[clusterCount].count);
             clusterCount++;
             printf("%d Clustere registreret\n", clusterCount);
           }
@@ -352,21 +356,23 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
   int currentX;
   int currentY;
 
-  printf("cluster painting begyndt\n");
-  printf("antallet af clusters er %d \n", clusterCount);
+  // printf("cluster painting begyndt\n");
+  // printf("antallet af clusters er %d \n", clusterCount);
 
   for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++)
   {
-    printf("Antallet af celler i cluster %d er %d\n", currentCluster, clusters[clusterCount].count);
-    for (int currentCoordinate = 0; currentCoordinate < clusters[clusterCount].count; currentCoordinate++)
+    //printf("Antallet af celler i cluster %d er %d\n", currentCluster, clusters[currentCluster].count);
+    for (int currentCoordinate = 0; currentCoordinate < clusters[currentCluster].count; currentCoordinate++)
     {
-      currentX = clusters[clusterCount].points[currentCoordinate].x;
-      currentY = clusters[clusterCount].points[currentCoordinate].y;
+      currentX = clusters[currentCluster].points[currentCoordinate].x;
+      currentY = clusters[currentCluster].points[currentCoordinate].y;
 
       printf("%d\n", currentX);
       printf("%d\n", currentY);
 
+      input_image[currentX][currentY][0] = 0;
       input_image[currentX][currentY][1] = 255;
+      input_image[currentX][currentY][2] = 0;
     }
   }
 }
