@@ -612,7 +612,7 @@ Cluster currentCluster;
 
 int main(int argc, char **argv)
 {
-
+  TIMER_start();
   if (argc != 3)
   {
     fprintf(stderr, "Wrong main arguments. Use: %s <output file path> <output file path>\n", argv[0]);
@@ -636,7 +636,7 @@ int main(int argc, char **argv)
   insert_marks_at_cell_locations(input_image);
 
   write_bitmap(input_image, argv[2]);
-
+  TIMER_stop("Total runtime: \n");
   printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
 }
