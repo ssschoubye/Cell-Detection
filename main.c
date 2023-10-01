@@ -20,12 +20,12 @@ typedef struct
 
 typedef struct
 {
-  Coordinate points[1000];
+  Coordinate points[10000];
   int count;
 } Cluster;
 
 Coordinate coordinates[1000];
-Cluster clusters[100];
+Cluster clusters[150];
 int clusterCount = 0;
 
 Coordinate queue[BMP_WIDTH * BMP_HEIGHT];
@@ -105,7 +105,7 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
   printf("clusters start\n");
-  Coordinate Area[1000];
+  Coordinate Area[10000];
   int count = 0;
   unsigned char visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
 
@@ -152,7 +152,7 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
         {
           printf("Cluster registrering begyndt\n");
           // Så her gemmer vi clusteret, alle dets coordinates og antallet af pixels i clusteret
-          if (count >= 350)
+          if (count >= 400)
           {
             // Her sætter vi tersklen til 400. Vi har talt, og nogen enkelte celler er lidt større end 400, og nogle clusters er lidt mindre end 400.
             // Men det virker som en fin value indtil videre, da det er bedre at betragte noget som et cluster, selvom det ikke er det,
@@ -357,16 +357,15 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
 
   for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++)
   {
-    printf("Antallet af celler i cluster %d er %d\n", currentCluster, clusters[clusterCount].count);
-    for (int currentCoordinate = 0; currentCoordinate < clusters[clusterCount].count; currentCoordinate++)
+    printf("Antallet af celler i cluster %d er %d\n", currentCluster, clusters[currentCluster].count);
+    for (int currentCoordinate = 0; currentCoordinate < clusters[currentCluster].count; currentCoordinate++)
     {
-      currentX = clusters[clusterCount].points[currentCoordinate].x;
-      currentY = clusters[clusterCount].points[currentCoordinate].y;
+      currentX = clusters[currentCluster].points[currentCoordinate].x;
+      currentY = clusters[currentCluster].points[currentCoordinate].y;
 
-      printf("%d\n", currentX);
-      printf("%d\n", currentY);
-
+      input_image[currentX][currentY][0] = 0;
       input_image[currentX][currentY][1] = 255;
+      input_image[currentX][currentY][2] = 0;
     }
   }
 }
