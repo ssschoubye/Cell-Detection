@@ -3,7 +3,9 @@
 #include "cbmp.h"
 #include <string.h>
 #include <unistd.h>
+#include <fftw3.h>
 
+unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS];
@@ -20,13 +22,24 @@ typedef struct
 
 typedef struct
 {
+  double re;
+  double im;
+} ComplexCoordinate;
+
+typedef struct
+{
   Coordinate points[10000];
-  int count;
+  int pixelCount;
+  Coordinate boundary[10000];
+  int boundaryCount;
+  ComplexCoordinate smoothedBoundary[10000];
 } Cluster;
 
 Coordinate coordinates[1000];
-Cluster clusters[150];
+Cluster clusters[300];
 int clusterCount = 0;
+fftw_complex output[10000];
+fftw_complex ift_result[10000];
 
 Coordinate queue[BMP_WIDTH * BMP_HEIGHT];
 int front = 0, rear = -1;
@@ -104,17 +117,20 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 
 void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
-  printf("clusters start\n");
+  // printf("clusters start\n");
   Coordinate Area[10000];
-  int count = 0;
+  int pixelCount = 0;
   unsigned char visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
+  unsigned char clusterFound;
 
   for (int x = 0; x < BMP_WIDTH; x++)
   {
+    clusterFound = 0;
     for (int y = 0; y < BMP_HEIGHT; y++)
     {
       if (black_white_image[x][y] == 255 && visited[x][y] == 0)
       {
+
         // Et punkt bliver fundet, vi tilføjer det til queue og starter vores while loop som finder alle hvide naboer iterativt
         enqueue(x, y);
         while (!isEmpty())
@@ -132,55 +148,159 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
                 int currentY = p.y + dy;
                 if (black_white_image[currentX][currentY] == 255 && visited[currentX][currentY] == 0)
                 {
-                  Area[count].x = currentX;
-                  Area[count].y = currentY;
-                  count++;
-                  // printf("%d cluster pixels fundet\n", count);
+                  Area[pixelCount].x = currentX;
+                  Area[pixelCount].y = currentY;
+                  pixelCount++;
+                  // printf("%d cluster pixels fundet\n", pixelCount);
                   enqueue(currentX, currentY);
                   visited[currentX][currentY] = 1;
                 }
               }
             }
           }
+          clusterFound = 1;
         }
 
-        // TODO fjern duplicates fra area. Vi har valgt ikke at gøre dette, fordi celler ikke bliver tilføjet til area, hvis de er visited.
-        // Og det er igen bedre at tælle noget som et cluster, selvom det ikke er, end omvendt.
-
         // Her er alle celler i cluster opdaget
-        if (isEmpty())
+        if (isEmpty() && clusterFound == 1)
         {
-          printf("Cluster registrering begyndt\n");
-          // Så her gemmer vi clusteret, alle dets coordinates og antallet af pixels i clusteret
-          if (count >= 400)
+          // printf("Cluster registrering begyndt\n");
+          //  Så her gemmer vi clusteret, alle dets coordinates og antallet af pixels i clusteret
+          if (pixelCount >= 499)
           {
-            // Her sætter vi tersklen til 400. Vi har talt, og nogen enkelte celler er lidt større end 400, og nogle clusters er lidt mindre end 400.
-            // Men det virker som en fin value indtil videre, da det er bedre at betragte noget som et cluster, selvom det ikke er det,
-            // end at ikke behandle noget som et cluster, når det er det
-            for (int point = 0; point < count; point++)
+            for (int point = 0; point < pixelCount; point++)
             {
               clusters[clusterCount].points[point].x = Area[point].x;
               clusters[clusterCount].points[point].y = Area[point].y;
             }
-            clusters[clusterCount].count = count;
-            printf("Count = %d\n", count);
-            printf("Cluster %d bestaar af %d celler\n", clusterCount, clusters[clusterCount].count);
+            clusters[clusterCount].pixelCount = pixelCount;
+            // printf("Pixel count = %d\n", pixelCount);
+            // printf("Cluster %d bestaar af %d pixels\n", clusterCount, clusters[clusterCount].pixelCount);
             clusterCount++;
-            printf("%d Clustere registreret\n", clusterCount);
+            // printf("%d Clustere registreret\n", clusterCount);
           }
 
           // Count og Area wipes
-          for (int i = 0; i < count; i++)
+          for (int i = 0; i < pixelCount; i++)
           {
             Area[i].x = 0;
             Area[i].y = 0;
           }
-          count = 0;
+          pixelCount = 0;
         }
       }
     }
   }
 }
+
+Coordinate find_cluster_center(Cluster cluster)
+{
+  int sumX = 0;
+  int sumY = 0;
+  for (int i = 0; i < cluster.pixelCount; i++)
+  {
+    sumX += cluster.points[i].x;
+    sumY += cluster.points[i].y;
+  }
+  Coordinate center;
+  center.x = sumX / cluster.pixelCount;
+  center.y = sumY / cluster.pixelCount;
+  return center;
+}
+
+Cluster find_cluster_boundary(Cluster cluster, unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
+{
+  int currentX = 0;
+  int currentY = 0;
+  int boundaryIndex = 0;
+  unsigned char hasBlackNeighbor;
+  for (int i = 0; i < cluster.pixelCount; i++)
+  {
+    hasBlackNeighbor = 0;
+    currentX = cluster.points[i].x;
+    currentY = cluster.points[i].y;
+    for (int dx = -1; dx <= 1; dx++)
+    {
+      for (int dy = -1; dy <= 1; dy++)
+      {
+        if (currentX + dx < BMP_WIDTH && currentX + dx >= 0 && currentY + dy < BMP_HEIGHT && currentY + dy >= 0)
+        {
+          if (black_white_image[currentX + dx][currentY + dy] == 0)
+          {
+            hasBlackNeighbor = 1;
+          }
+        }
+      }
+    }
+    if (hasBlackNeighbor)
+    {
+      Coordinate boundaryPixel;
+      boundaryPixel.x = currentX;
+      boundaryPixel.y = currentY;
+      cluster.boundary[boundaryIndex] = boundaryPixel;
+      boundaryIndex++;
+      cluster.boundaryCount++;
+    }
+  }
+  return cluster;
+}
+
+void boundary_to_freq_domain(Cluster *cluster)
+{
+  printf("Entering boundary_to_freq_domain\n");
+  printf("Boundary count: %d\n", cluster->boundaryCount);
+
+  if (cluster->boundaryCount > 10000)
+  {
+    printf("Warning: Boundary count exceeds array size!\n");
+  }
+
+  fftw_complex complex[10000];
+  for (int i = 0; i < cluster->boundaryCount; i++)
+  {
+    printf("Boundary Point[%d]: (%u, %u)\n", i, cluster->boundary[i].x, cluster->boundary[i].y);
+    complex[i][0] = cluster->boundary[i].x;
+    complex[i][1] = cluster->boundary[i].y;
+  }
+
+  fftw_plan plan = fftw_plan_dft_1d(cluster->boundaryCount, complex, output, FFTW_FORWARD, FFTW_ESTIMATE);
+  if (plan == NULL) {
+    printf("Failed to create FFTW plan.\n");
+  }
+
+  fftw_execute(plan);
+  fftw_destroy_plan(plan);
+  printf("Exiting boundary_to_freq_domain\n");
+}
+
+// void freq_to_spatial_domain(fftw_complex *output, int boundaryCount, Cluster *cluster) {
+//   fftw_plan plan = fftw_plan_dft_1d(boundaryCount, output, ift_result, FFTW_BACKWARD, FFTW_ESTIMATE);
+//   fftw_execute(plan);
+//   fftw_destroy_plan(plan);
+
+//   for (int i = 0; i < boundaryCount; i++) {
+//     ift_result[i][0] /= boundaryCount;
+//     ift_result[i][1] /= boundaryCount;
+//   }
+//   for (int j = 0; j < boundaryCount; j++){
+//     cluster->smoothedBoundary[j].re = ift_result[j][0];
+//     cluster->smoothedBoundary[j].im = ift_result[j][1];
+//   }
+// }
+
+// void print_boundaries_and_smoothed(Cluster cluster) {
+//   printf("Original Boundary Points:\n");
+//   for(int i = 0; i < cluster.boundaryCount; i++) {
+//     printf("(%d, %d) ", cluster.boundary[i].x, cluster.boundary[i].y);
+//   }
+//   printf("\n");
+
+//   printf("Smoothed Boundary Points via FFTW:\n");
+//   for(int i = 0; i < cluster.boundaryCount; i++) {
+//     printf("(%lf, %lf) ", cluster.smoothedBoundary[i].re, cluster.smoothedBoundary[i].im);
+//   }
+//   printf("\n");
+// }
 
 void convert_2d_to_3d(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
 {
@@ -352,13 +472,13 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
   int currentX;
   int currentY;
 
-  printf("cluster painting begyndt\n");
-  printf("antallet af clusters er %d \n", clusterCount);
+  // printf("cluster painting begyndt\n");
+  // printf("antallet af clusters er %d \n", clusterCount);
 
   for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++)
   {
-    printf("Antallet af celler i cluster %d er %d\n", currentCluster, clusters[currentCluster].count);
-    for (int currentCoordinate = 0; currentCoordinate < clusters[currentCluster].count; currentCoordinate++)
+    // printf("Antallet af celler i cluster %d er %d\n", currentCluster, clusters[currentCluster].pixelCount);
+    for (int currentCoordinate = 0; currentCoordinate < clusters[currentCluster].pixelCount; currentCoordinate++)
     {
       currentX = clusters[currentCluster].points[currentCoordinate].x;
       currentY = clusters[currentCluster].points[currentCoordinate].y;
@@ -366,6 +486,63 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
       input_image[currentX][currentY][0] = 0;
       input_image[currentX][currentY][1] = 255;
       input_image[currentX][currentY][2] = 0;
+    }
+  }
+}
+
+void paint_centers_blue(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
+{
+  Coordinate center;
+  int centerX;
+  int centerY;
+
+  for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++)
+  {
+    center = find_cluster_center(clusters[currentCluster]);
+    centerX = center.x;
+    centerY = center.y;
+
+    for (int dx = -3; dx <= 3; dx++)
+    {
+      for (int dy = -3; dy <= 3; dy++)
+      {
+        int paintX = centerX + dx;
+        int paintY = centerY + dy;
+
+        // Check boundary conditions
+        if (paintX >= 0 && paintX < BMP_WIDTH && paintY >= 0 && paintY < BMP_HEIGHT)
+        {
+          input_image[paintX][paintY][0] = 0;
+          input_image[paintX][paintY][1] = 0;
+          input_image[paintX][paintY][2] = 255;
+        }
+      }
+    }
+  }
+}
+
+void paint_boundaries_red(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
+{
+  int currentX;
+  int currentY;
+  Cluster updatedCluster;
+
+  for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++)
+  {
+    updatedCluster = find_cluster_boundary(clusters[currentCluster], black_white_image);
+
+    for (int i = 0; i < updatedCluster.boundaryCount; i++)
+    {
+      currentX = updatedCluster.boundary[i].x;
+      currentY = updatedCluster.boundary[i].y;
+
+      // Check boundary conditions
+      if (currentX >= 0 && currentX < BMP_WIDTH && currentY >= 0 && currentY < BMP_HEIGHT)
+      {
+        input_image[currentX][currentY][0] = 255;
+        input_image[currentX][currentY][1] = 0;
+        input_image[currentX][currentY][2] = 0;
+      }
     }
   }
 }
@@ -406,9 +583,9 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
 }
 
 unsigned char grey_image[BMP_WIDTH][BMP_HEIGHT];
-unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
+Cluster currentCluster;
 
 int main(int argc, char **argv)
 {
@@ -425,12 +602,29 @@ int main(int argc, char **argv)
 
   binary_threshold(grey_image, black_white_image);
 
-  printf("foer clusters\n");
   find_cell_clusters(black_white_image);
 
   paint_clusters_green(input_image);
 
+  paint_centers_blue(input_image);
+
+  paint_boundaries_red(input_image, black_white_image);
+
   write_bitmap(input_image, argv[2]);
+
+  for (int i = 0; i < clusterCount; i++)
+  {
+    printf("Starting loop\n");
+    currentCluster = find_cluster_boundary(clusters[i], black_white_image);
+    // Perform the boundary to frequency domain transformation
+    boundary_to_freq_domain(&currentCluster); // Pass the address because the function expects a pointer
+
+    // Transform back to the spatial domain
+    // freq_to_spatial_domain(output, clusters[i].boundaryCount, &clusters[i]);  // Similar reasoning for passing pointer
+
+    // Print original and smoothed boundaries
+    // print_boundaries_and_smoothed(clusters[i]);
+  }
 
   // erode_and_detect_loop(black_white_image, argv[2]);
 
