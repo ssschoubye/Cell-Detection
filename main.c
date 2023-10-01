@@ -3,6 +3,7 @@
 #include "cbmp.h"
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
@@ -106,7 +107,7 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
     {
-      unsigned char threshold = (optimal_Threshold << 1) + optimal_Threshold;
+      
       if (grey_scale_image[x][y] <= optimal_Threshold)
       {
         black_white_image[x][y] = 0;
@@ -295,18 +296,18 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
     //print the eroded image
     convert_2d_to_3d(eroded_image, output_image);
     write_bitmap(output_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    //sleep(sleep_time);
 
     //detect cells and print
     detect_cells(eroded_image, removed_cells_image);
     convert_2d_to_3d(removed_cells_image, output_image);
     write_bitmap(output_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    //sleep(sleep_time);
 
     //insert marks and print
     insert_marks_at_cell_locations(input_image);
     write_bitmap(input_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    //sleep(sleep_time);
 
     //Recurse
     erode_and_detect_loop(removed_cells_image, output_file_path);
@@ -326,7 +327,7 @@ unsigned char removed_cells_image[BMP_WIDTH][BMP_HEIGHT];
 
 int main(int argc, char **argv)
 {
-
+TIMER_start();
   if (argc != 3)
   {
     fprintf(stderr, "Wrong main arguments. Use: %s <output file path> <output file path>\n", argv[0]);
@@ -359,6 +360,7 @@ int main(int argc, char **argv)
   // write_bitmap(input_image, argv[2]);
 
   // printf("Done!\n");
+  TIMER_stop("Programmet tog:");
   printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
 }
