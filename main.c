@@ -3,7 +3,8 @@
 #include "cbmp.h"
 #include <string.h>
 #include <unistd.h>
-#include <fftw3.h>
+#include <fftw3.h> //Bibliotek til at lave fourier transformationer
+#include <math.h>
 
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
@@ -40,6 +41,7 @@ Cluster clusters[300];
 int clusterCount = 0;
 fftw_complex output[10000];
 fftw_complex ift_result[10000];
+double slopes[10000];
 
 Coordinate queue[BMP_WIDTH * BMP_HEIGHT];
 int front = 0, rear = -1;
@@ -76,6 +78,91 @@ static inline int max(int a, int b)
 static inline int min(int a, int b)
 {
   return a < b ? a : b;
+}
+
+void transpose(double **A, double **A_T, int rows, int cols)
+{
+  for (int i = 0; i < rows; i++)
+  {
+    for (int j = 0; j < cols; j++)
+    {
+      A_T[j][i] = A[i][j];
+    }
+  }
+}
+
+int invert(double **A, double **A_inv, int n)
+{
+  for (int i = 0; i < n; i++)
+  {
+    for (int j = 0; j < n; j++)
+    {
+      A_inv[i][j] = (i == j) ? 1.0 : 0.0;
+    }
+  }
+  for (int i = 0; i < n; i++)
+  {
+    double max_val = fabs(A[i][i]);
+    int pivot_row = i;
+    for (int row = i + 1; row < n; row++)
+    {
+      if (fabs(A[row][i]) > max_val)
+      {
+        max_val = fabs(A[row][i]);
+        pivot_row = row;
+      }
+    }
+    if (i != pivot_row)
+    {
+      for (int j = 0; j < n; j++)
+      {
+        double tmp = A[i][j];
+        A[i][j] = A[pivot_row][j];
+        A[pivot_row][j] = tmp;
+
+        tmp = A_inv[i][j];
+        A_inv[i][j] = A_inv[pivot_row][j];
+        A_inv[pivot_row][j] = tmp;
+      }
+    }
+    double factor = A[i][i];
+    if (fabs(factor) < 1e-8)
+    {
+      return -1;
+    }
+    for (int j = 0; j < n; j++)
+    {
+      A[i][j] /= factor;
+      A_inv[i][j] /= factor;
+    }
+    for (int row = 0; row < n; row++)
+    {
+      if (row == i)
+        continue;
+      double factor = A[row][i];
+      for (int j = 0; j < n; j++)
+      {
+        A[row][j] -= factor * A[i][j];
+        A_inv[row][j] -= factor * A_inv[i][j];
+      }
+    }
+  }
+  return 0;
+}
+
+void multiply_matrices(double **A, double **B, double **C, int rowsA, int colsA, int colsB)
+{
+  for (int i = 0; i < rowsA; i++)
+  {
+    for (int j = 0; j < colsB; j++)
+    {
+      C[i][j] = 0.0;
+      for (int k = 0; k < colsA; k++)
+      {
+        C[i][j] += A[i][k] * B[k][j];
+      }
+    }
+  }
 }
 
 void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT])
@@ -117,7 +204,7 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 
 void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
-  // printf("clusters start\n");
+  printf("clusters start\n");
   Coordinate Area[10000];
   int pixelCount = 0;
   unsigned char visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
@@ -191,6 +278,7 @@ void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
       }
     }
   }
+  printf("clusters end\n");
 }
 
 Coordinate find_cluster_center(Cluster cluster)
@@ -247,60 +335,138 @@ Cluster find_cluster_boundary(Cluster cluster, unsigned char black_white_image[B
 
 void boundary_to_freq_domain(Cluster *cluster)
 {
-  printf("Entering boundary_to_freq_domain\n");
-  printf("Boundary count: %d\n", cluster->boundaryCount);
-
-  if (cluster->boundaryCount > 10000)
-  {
-    printf("Warning: Boundary count exceeds array size!\n");
-  }
-
   fftw_complex complex[10000];
   for (int i = 0; i < cluster->boundaryCount; i++)
   {
-    printf("Boundary Point[%d]: (%u, %u)\n", i, cluster->boundary[i].x, cluster->boundary[i].y);
     complex[i][0] = cluster->boundary[i].x;
     complex[i][1] = cluster->boundary[i].y;
   }
 
   fftw_plan plan = fftw_plan_dft_1d(cluster->boundaryCount, complex, output, FFTW_FORWARD, FFTW_ESTIMATE);
-  if (plan == NULL) {
-    printf("Failed to create FFTW plan.\n");
-  }
-
   fftw_execute(plan);
   fftw_destroy_plan(plan);
-  printf("Exiting boundary_to_freq_domain\n");
 }
 
-// void freq_to_spatial_domain(fftw_complex *output, int boundaryCount, Cluster *cluster) {
-//   fftw_plan plan = fftw_plan_dft_1d(boundaryCount, output, ift_result, FFTW_BACKWARD, FFTW_ESTIMATE);
-//   fftw_execute(plan);
-//   fftw_destroy_plan(plan);
+void freq_to_spatial_domain(fftw_complex *output, int boundaryCount, Cluster *cluster)
+{
+  fftw_plan plan = fftw_plan_dft_1d(boundaryCount, output, ift_result, FFTW_BACKWARD, FFTW_ESTIMATE);
+  fftw_execute(plan);
+  fftw_destroy_plan(plan);
 
-//   for (int i = 0; i < boundaryCount; i++) {
-//     ift_result[i][0] /= boundaryCount;
-//     ift_result[i][1] /= boundaryCount;
-//   }
-//   for (int j = 0; j < boundaryCount; j++){
-//     cluster->smoothedBoundary[j].re = ift_result[j][0];
-//     cluster->smoothedBoundary[j].im = ift_result[j][1];
-//   }
-// }
+  for (int i = 0; i < boundaryCount; i++)
+  {
+    ift_result[i][0] /= boundaryCount;
+    ift_result[i][1] /= boundaryCount;
+  }
+  for (int j = 0; j < boundaryCount; j++)
+  {
+    cluster->smoothedBoundary[j].re = ift_result[j][0];
+    cluster->smoothedBoundary[j].im = ift_result[j][1];
+  }
+}
 
-// void print_boundaries_and_smoothed(Cluster cluster) {
-//   printf("Original Boundary Points:\n");
-//   for(int i = 0; i < cluster.boundaryCount; i++) {
-//     printf("(%d, %d) ", cluster.boundary[i].x, cluster.boundary[i].y);
-//   }
-//   printf("\n");
+void store_slopes(double slopes[], double x[1][1], int index) {
+    slopes[index] = x[0][0]; 
+}
 
-//   printf("Smoothed Boundary Points via FFTW:\n");
-//   for(int i = 0; i < cluster.boundaryCount; i++) {
-//     printf("(%lf, %lf) ", cluster.smoothedBoundary[i].re, cluster.smoothedBoundary[i].im);
-//   }
-//   printf("\n");
-// }
+void calculate_slopes(Cluster *cluster)
+{
+  int N = 3; 
+  int L = cluster->boundaryCount;
+  double *slopes = malloc((L - 2 * N) * sizeof(double));
+
+  double **A = malloc((2 * N + 1) * sizeof(double *));
+  double **Y = malloc((2 * N + 1) * sizeof(double *));
+  double **A_T = malloc(2 * sizeof(double *));
+  double **A_T_A = malloc(2 * sizeof(double *));
+  double **A_inv = malloc(2 * sizeof(double *));
+  double **A_T_Y = malloc(2 * sizeof(double *));
+  double **x = malloc(2 * sizeof(double *));
+
+  for (int i = 0; i < 2 * N + 1; i++) {
+    A[i] = malloc(2 * sizeof(double));
+    Y[i] = malloc(sizeof(double));
+  }
+
+  for (int i = 0; i < 2; i++) {
+    A_T[i] = malloc((2 * N + 1) * sizeof(double));
+    A_T_A[i] = malloc(2 * sizeof(double));
+    A_inv[i] = malloc(2 * sizeof(double));
+    A_T_Y[i] = malloc((2 * N + 1) * sizeof(double));
+    x[i] = malloc(sizeof(double));
+  }
+
+  // Main logic
+  for (int j = N; j < L - N; j++) {
+    for (int i = -N; i <= N; i++) {
+      A[i + N][0] = j + i;
+      A[i + N][1] = 1;
+      Y[i + N][0] = sqrt(pow(cluster->smoothedBoundary[j + i].re, 2) + pow(cluster->smoothedBoundary[j + i].im, 2));
+    }
+
+    transpose(A, A_T, 2 * N + 1, 2);
+    multiply_matrices(A_T, A, A_T_A, 2, 2 * N + 1, 2);
+    invert(A_T_A, A_inv, 2);
+    multiply_matrices(A_T, Y, A_T_Y, 2, 2 * N + 1, 1);
+    multiply_matrices(A_inv, A_T_Y, x, 2, 2, 1);
+    store_slopes(slopes, x, j - N);
+
+    printf("Coordinates in x are %lf, %lf \n", x[0][0], x[1][0]);
+
+    double threshold = 0.5;
+    find_bottlenecks(slopes, L - 2 * N, threshold);
+
+    // Free allocated memory
+    free(slopes);
+  }
+
+  // Deallocate memory
+  for (int i = 0; i < 2 * N + 1; i++) {
+    free(A[i]);
+    free(Y[i]);
+  }
+
+  for (int i = 0; i < 2; i++) {
+    free(A_T[i]);
+    free(A_T_A[i]);
+    free(A_inv[i]);
+    free(A_T_Y[i]);
+    free(x[i]);
+  }
+
+  free(A);
+  free(Y);
+  free(A_T);
+  free(A_T_A);
+  free(A_inv);
+  free(A_T_Y);
+  free(x);
+}
+
+void find_bottlenecks(double slopes[], int size, double threshold) {
+    for (int i = 1; i < size; i++) {
+        if (fabs(slopes[i] - slopes[i-1]) > threshold) {
+            printf("Bottleneck point at index %d\n", i);
+        }
+    }
+}
+
+void print_boundaries_and_smoothed(Cluster cluster)
+{
+  printf("Original Boundary Points:\n");
+  for (int i = 0; i < cluster.boundaryCount; i++)
+  {
+    printf("(%d, %d) ", cluster.boundary[i].x, cluster.boundary[i].y);
+  }
+  printf("\n");
+
+  printf("Smoothed Boundary Points via FFTW:\n");
+  for (int i = 0; i < cluster.boundaryCount; i++)
+  {
+    printf("(%lf, %lf) ", cluster.smoothedBoundary[i].re, cluster.smoothedBoundary[i].im);
+  }
+  printf("\n");
+}
 
 void convert_2d_to_3d(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
 {
@@ -469,6 +635,7 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
 
 void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
 {
+  printf("started painting clusters\n");
   int currentX;
   int currentY;
 
@@ -488,10 +655,12 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
       input_image[currentX][currentY][2] = 0;
     }
   }
+  printf("finished painting clusters\n");
 }
 
 void paint_centers_blue(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
 {
+  printf("started painting centers\n");
   Coordinate center;
   int centerX;
   int centerY;
@@ -519,10 +688,12 @@ void paint_centers_blue(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHA
       }
     }
   }
+  printf("finished painting centers\n");
 }
 
 void paint_boundaries_red(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
+  printf("started painting boundaries\n");
   int currentX;
   int currentY;
   Cluster updatedCluster;
@@ -545,7 +716,33 @@ void paint_boundaries_red(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
       }
     }
   }
+  printf("finished painting boundaries\n");
 }
+
+void paint_bottlenecks(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], Cluster currentCluster, double slopes[], double threshold)
+{
+    int N = 3; // The same N value used in calculate_slopes
+    int L = currentCluster.boundaryCount;
+    int currentX;
+    int currentY;
+
+    for (int i = 1; i < L - 2 * N; i++) 
+    {
+        if (fabs(slopes[i] - slopes[i - 1]) > threshold) 
+        {
+            currentX = currentCluster.boundary[i + N].x;
+            currentY = currentCluster.boundary[i + N].y;
+
+            if (currentX >= 0 && currentX < BMP_WIDTH && currentY >= 0 && currentY < BMP_HEIGHT) 
+            {
+                input_image[currentX][currentY][0] = 255;
+                input_image[currentX][currentY][1] = 0;
+                input_image[currentX][currentY][2] = 0;
+            }
+        }
+    }
+}
+
 
 void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], char *output_file_path)
 {
@@ -558,18 +755,18 @@ void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT
     // print the eroded image
     convert_2d_to_3d(eroded_image, output_image);
     write_bitmap(output_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    // sleep(sleep_time);
 
     // detect cells and print
     detect_cells(eroded_image, removed_cells_image);
     convert_2d_to_3d(removed_cells_image, output_image);
     write_bitmap(output_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    // sleep(sleep_time);
 
     // insert marks and print
     insert_marks_at_cell_locations(input_image);
     write_bitmap(input_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    // sleep(sleep_time);
 
     // Recurse
     erode_and_detect_loop(removed_cells_image, output_file_path);
@@ -589,7 +786,7 @@ Cluster currentCluster;
 
 int main(int argc, char **argv)
 {
-
+  printf("program started\n");
   if (argc != 3)
   {
     fprintf(stderr, "Wrong main arguments. Use: %s <output file path> <output file path>\n", argv[0]);
@@ -611,20 +808,21 @@ int main(int argc, char **argv)
   paint_boundaries_red(input_image, black_white_image);
 
   write_bitmap(input_image, argv[2]);
+  double threshold = 0.5;
 
   for (int i = 0; i < clusterCount; i++)
   {
-    printf("Starting loop\n");
     currentCluster = find_cluster_boundary(clusters[i], black_white_image);
-    // Perform the boundary to frequency domain transformation
-    boundary_to_freq_domain(&currentCluster); // Pass the address because the function expects a pointer
 
-    // Transform back to the spatial domain
-    // freq_to_spatial_domain(output, clusters[i].boundaryCount, &clusters[i]);  // Similar reasoning for passing pointer
+    boundary_to_freq_domain(&currentCluster);
 
-    // Print original and smoothed boundaries
-    // print_boundaries_and_smoothed(clusters[i]);
+    freq_to_spatial_domain(output, currentCluster.boundaryCount, &currentCluster);
+
+    calculate_slopes(&currentCluster);
+
+    paint_bottlenecks(input_image, currentCluster, slopes, threshold);
   }
+  
 
   // erode_and_detect_loop(black_white_image, argv[2]);
 
