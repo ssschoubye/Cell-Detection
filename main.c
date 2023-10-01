@@ -3,7 +3,7 @@
 #include "cbmp.h"
 #include <string.h>
 #include <unistd.h>
-#include <fftw3.h>
+#include <fftw3.h> //Bibliotek til at lave fourier transformationer. Kan ekskluderes.
 
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
 unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT];
@@ -89,7 +89,6 @@ void grey_scale(unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS], un
       unsigned char blue = rgb_image[x][y][2];
 
       unsigned char grey = (red + green + blue) / 3;
-      // binray threshhold kan laves her. så kan man slippe for division, og for at lagre den midlertidige resultat grey_scale_image i et array
 
       grey_scale_image[x][y] = grey;
     }
@@ -117,7 +116,6 @@ void binary_threshold(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], uns
 
 void find_cell_clusters(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT])
 {
-  // printf("clusters start\n");
   Coordinate Area[10000];
   int pixelCount = 0;
   unsigned char visited[BMP_WIDTH][BMP_HEIGHT] = {{0}};
@@ -247,60 +245,32 @@ Cluster find_cluster_boundary(Cluster cluster, unsigned char black_white_image[B
 
 void boundary_to_freq_domain(Cluster *cluster)
 {
-  printf("Entering boundary_to_freq_domain\n");
-  printf("Boundary count: %d\n", cluster->boundaryCount);
-
-  if (cluster->boundaryCount > 10000)
-  {
-    printf("Warning: Boundary count exceeds array size!\n");
-  }
-
   fftw_complex complex[10000];
   for (int i = 0; i < cluster->boundaryCount; i++)
   {
-    printf("Boundary Point[%d]: (%u, %u)\n", i, cluster->boundary[i].x, cluster->boundary[i].y);
     complex[i][0] = cluster->boundary[i].x;
     complex[i][1] = cluster->boundary[i].y;
   }
 
   fftw_plan plan = fftw_plan_dft_1d(cluster->boundaryCount, complex, output, FFTW_FORWARD, FFTW_ESTIMATE);
-  if (plan == NULL) {
-    printf("Failed to create FFTW plan.\n");
-  }
-
   fftw_execute(plan);
   fftw_destroy_plan(plan);
-  printf("Exiting boundary_to_freq_domain\n");
 }
 
-// void freq_to_spatial_domain(fftw_complex *output, int boundaryCount, Cluster *cluster) {
-//   fftw_plan plan = fftw_plan_dft_1d(boundaryCount, output, ift_result, FFTW_BACKWARD, FFTW_ESTIMATE);
-//   fftw_execute(plan);
-//   fftw_destroy_plan(plan);
+ void freq_to_spatial_domain(fftw_complex *output, int boundaryCount, Cluster *cluster) {
+   fftw_plan plan = fftw_plan_dft_1d(boundaryCount, output, ift_result, FFTW_BACKWARD, FFTW_ESTIMATE);
+   fftw_execute(plan);
+   fftw_destroy_plan(plan);
 
-//   for (int i = 0; i < boundaryCount; i++) {
-//     ift_result[i][0] /= boundaryCount;
-//     ift_result[i][1] /= boundaryCount;
-//   }
-//   for (int j = 0; j < boundaryCount; j++){
-//     cluster->smoothedBoundary[j].re = ift_result[j][0];
-//     cluster->smoothedBoundary[j].im = ift_result[j][1];
-//   }
-// }
-
-// void print_boundaries_and_smoothed(Cluster cluster) {
-//   printf("Original Boundary Points:\n");
-//   for(int i = 0; i < cluster.boundaryCount; i++) {
-//     printf("(%d, %d) ", cluster.boundary[i].x, cluster.boundary[i].y);
-//   }
-//   printf("\n");
-
-//   printf("Smoothed Boundary Points via FFTW:\n");
-//   for(int i = 0; i < cluster.boundaryCount; i++) {
-//     printf("(%lf, %lf) ", cluster.smoothedBoundary[i].re, cluster.smoothedBoundary[i].im);
-//   }
-//   printf("\n");
-// }
+   for (int i = 0; i < boundaryCount; i++) {
+     ift_result[i][0] /= boundaryCount;
+     ift_result[i][1] /= boundaryCount;
+   }
+   for (int j = 0; j < boundaryCount; j++){
+     cluster->smoothedBoundary[j].re = ift_result[j][0];
+     cluster->smoothedBoundary[j].im = ift_result[j][1];
+   }
+ }
 
 void convert_2d_to_3d(unsigned char grey_scale_image[BMP_WIDTH][BMP_HEIGHT], unsigned char rgb_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHANNELS])
 {
@@ -455,12 +425,9 @@ void insert_marks_at_cell_locations(unsigned char input_image[BMP_WIDTH][BMP_HEI
 
         if (x >= 0 && x < BMP_WIDTH && y >= 0 && y < BMP_HEIGHT)
         {
-          // if (dx == -6 || dx == 6 || dy == -6 || dy == 6)
-          //{
           input_image[x][y][0] = 255;
           input_image[x][y][1] = 0;
           input_image[x][y][2] = 0;
-          //}
         }
       }
     }
@@ -471,13 +438,8 @@ void paint_clusters_green(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
 {
   int currentX;
   int currentY;
-
-  // printf("cluster painting begyndt\n");
-  // printf("antallet af clusters er %d \n", clusterCount);
-
   for (int currentCluster = 0; currentCluster < clusterCount; currentCluster++)
   {
-    // printf("Antallet af celler i cluster %d er %d\n", currentCluster, clusters[currentCluster].pixelCount);
     for (int currentCoordinate = 0; currentCoordinate < clusters[currentCluster].pixelCount; currentCoordinate++)
     {
       currentX = clusters[currentCluster].points[currentCoordinate].x;
@@ -509,7 +471,6 @@ void paint_centers_blue(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_CHA
         int paintX = centerX + dx;
         int paintY = centerY + dy;
 
-        // Check boundary conditions
         if (paintX >= 0 && paintX < BMP_WIDTH && paintY >= 0 && paintY < BMP_HEIGHT)
         {
           input_image[paintX][paintY][0] = 0;
@@ -536,7 +497,6 @@ void paint_boundaries_red(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
       currentX = updatedCluster.boundary[i].x;
       currentY = updatedCluster.boundary[i].y;
 
-      // Check boundary conditions
       if (currentX >= 0 && currentX < BMP_WIDTH && currentY >= 0 && currentY < BMP_HEIGHT)
       {
         input_image[currentX][currentY][0] = 255;
@@ -549,36 +509,36 @@ void paint_boundaries_red(unsigned char input_image[BMP_WIDTH][BMP_HEIGHT][BMP_C
 
 void erode_and_detect_loop(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], char *output_file_path)
 {
-  int sleep_time = 1;
+  //int sleep_time = 1;
   // erode and print
   erode(black_white_image, eroded_image);
 
   if (erosion_happened)
   {
     // print the eroded image
-    convert_2d_to_3d(eroded_image, output_image);
-    write_bitmap(output_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    //convert_2d_to_3d(eroded_image, output_image);
+    //write_bitmap(output_image, "output_images/LiveProcess.bmp");
+    //sleep(sleep_time);
 
     // detect cells and print
     detect_cells(eroded_image, removed_cells_image);
-    convert_2d_to_3d(removed_cells_image, output_image);
-    write_bitmap(output_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    //convert_2d_to_3d(removed_cells_image, output_image);
+    //write_bitmap(output_image, "output_images/LiveProcess.bmp");
+    //sleep(sleep_time);
 
     // insert marks and print
-    insert_marks_at_cell_locations(input_image);
-    write_bitmap(input_image, "output_images/LiveProcess.bmp");
-    sleep(sleep_time);
+    //insert_marks_at_cell_locations(input_image);
+    //write_bitmap(input_image, "output_images/LiveProcess.bmp");
+    //sleep(sleep_time);
 
     // Recurse
     erode_and_detect_loop(removed_cells_image, output_file_path);
   }
   else if (!erosion_happened)
   {
-    insert_marks_at_cell_locations(input_image);
-    write_bitmap(input_image, output_file_path);
-    printf("Alle celler er opdaget!\n");
+    //insert_marks_at_cell_locations(input_image);
+    //write_bitmap(input_image, output_file_path);
+    //printf("Alle celler er opdaget!\n");
   }
 }
 
@@ -606,27 +566,13 @@ int main(int argc, char **argv)
 
   paint_clusters_green(input_image);
 
-  paint_centers_blue(input_image);
-
   paint_boundaries_red(input_image, black_white_image);
 
+  erode_and_detect_loop(black_white_image, argv[2]);
+
+  insert_marks_at_cell_locations(input_image);
+
   write_bitmap(input_image, argv[2]);
-
-  for (int i = 0; i < clusterCount; i++)
-  {
-    printf("Starting loop\n");
-    currentCluster = find_cluster_boundary(clusters[i], black_white_image);
-    // Perform the boundary to frequency domain transformation
-    boundary_to_freq_domain(&currentCluster); // Pass the address because the function expects a pointer
-
-    // Transform back to the spatial domain
-    // freq_to_spatial_domain(output, clusters[i].boundaryCount, &clusters[i]);  // Similar reasoning for passing pointer
-
-    // Print original and smoothed boundaries
-    // print_boundaries_and_smoothed(clusters[i]);
-  }
-
-  // erode_and_detect_loop(black_white_image, argv[2]);
 
   printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
