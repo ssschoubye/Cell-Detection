@@ -3,6 +3,7 @@
 #include "cbmp.h"
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 //#include <fftw3.h> //Bibliotek til at lave fourier transformationer. Kan ekskluderes.
 
 unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT];
@@ -22,7 +23,7 @@ unsigned int optimal_Threshold;
 #define TIMER_stop(name) do { \
     clock_t end = clock(); \
     double time_taken = ((double) (end - start)) / CLOCKS_PER_SEC; \
-    printf("%stog: %f seconds\n", name, time_taken); \
+    printf("%sRun time of erosion step took: %f seconds\n", name, time_taken); \
 } while(0)
 
 typedef struct
@@ -362,7 +363,7 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
       temp_image[x][y] = black_white_image[x][y];
     }
   }
-
+    TIMER_start();
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
@@ -391,7 +392,7 @@ void erode(unsigned char black_white_image[BMP_WIDTH][BMP_HEIGHT], unsigned char
       }
     }
   }
-
+    TIMER_stop("Total runtime: \n");
   for (int x = 0; x < BMP_WIDTH; x++)
   {
     for (int y = 0; y < BMP_HEIGHT; y++)
@@ -448,7 +449,7 @@ void detect_cells(unsigned char eroded_image[BMP_WIDTH][BMP_HEIGHT], unsigned ch
           amount_of_cells++;
           coordinates[amount_of_cells - 1].x = x;
           coordinates[amount_of_cells - 1].y = y;
-          printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells, coordinates[amount_of_cells - 1].x, coordinates[amount_of_cells - 1].y);
+          //printf("Celle nummer %d har x-koordinatet %d og y-koordinatet %d\n", amount_of_cells, coordinates[amount_of_cells - 1].x, coordinates[amount_of_cells - 1].y);
 
           for (int dx = max(-5, -x); dx <= min(5, BMP_WIDTH - x - 1); dx++)
           {
@@ -612,7 +613,7 @@ Cluster currentCluster;
 
 int main(int argc, char **argv)
 {
-  TIMER_start();
+  //TIMER_start();
   if (argc != 3)
   {
     fprintf(stderr, "Wrong main arguments. Use: %s <output file path> <output file path>\n", argv[0]);
@@ -636,7 +637,7 @@ int main(int argc, char **argv)
   insert_marks_at_cell_locations(input_image);
 
   write_bitmap(input_image, argv[2]);
-  TIMER_stop("Total runtime: \n");
+  //TIMER_stop("Total runtime: \n");
   printf("Paa billedet var antallet af celler lig med: %d\n", amount_of_cells);
   return 0;
 }
